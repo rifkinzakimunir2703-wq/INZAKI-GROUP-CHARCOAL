@@ -1,28 +1,19 @@
-# INZAKI GROUP — Charcoal Business Portal v2
+# INZAKI GROUP — Charcoal Business Portal v3
 
-Portal jurnal industri arang dengan alur:
-Bahan Baku → Produksi Batch → Penyusutan → HPP → Barang Jadi → Penjualan → Laba per Batch.
+Alur: Bahan Baku → Produksi Batch → Penyusutan → HPP → Barang Jadi → Penjualan → Laba.
 
-## Rumus
-Penyusutan (kg) = bahan baku masuk - hasil barang jadi.
-Penyusutan (%) = penyusutan / bahan baku masuk × 100%.
-HPP batch = biaya bahan baku + tenaga kerja + energi + biaya lain.
-HPP/kg = HPP batch / hasil barang jadi.
-Laba batch = omzet penjualan dari batch - HPP barang yang terjual.
-Laba bersih jurnal = omzet - HPP terjual - pengeluaran umum.
-
-## Fitur
-- Stok bahan baku dengan harga/kg dan supplier.
-- Batch produksi otomatis BCH-YYYY-XXX.
-- Pemakaian bahan baku otomatis mengurangi stok.
+## v3
+- Input bahan baku: harga/kg, biaya transportasi, biaya lain-lain, supplier.
+- Transportasi + biaya lain-lain masuk ke biaya bahan dan memengaruhi HPP/kg bahan.
+- Dashboard global: stok bahan baku saat ini, stok barang jadi saat ini, laba mingguan, laba bulanan, pengeluaran mingguan, pengeluaran bulanan.
+- Laba mingguan/bulanan = omzet periode - HPP barang terjual periode - pengeluaran operasional periode.
+- Batch produksi otomatis.
 - Penyusutan otomatis.
-- HPP bahan baku berdasarkan harga bahan yang dipakai.
-- Biaya tenaga kerja, energi, dan biaya lain per batch.
-- Stok barang jadi per batch.
-- Penjualan wajib memilih batch sehingga HPP dan laba dapat ditelusuri.
-- Laporan profitabilitas per batch.
+- HPP batch otomatis.
+- Laba per batch dan margin.
 - Backup JSON.
 - Responsive HP/desktop.
-- LocalStorage, tanpa server.
+- Data lokal di browser.
 
-Upload seluruh file ke repository GitHub lalu aktifkan GitHub Pages.
+## GitHub Pages
+Upload `index.html`, `style.css`, `app.js`, dan `README.md` langsung ke root repository. Aktifkan Settings → Pages → Deploy from a branch → main → /(root).
