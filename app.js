@@ -1,863 +1,223 @@
-/* ================= INZAKI GROUP — Charcoal Business Portal =================
-   app.js — compatible with current Supabase sales schema
-   ========================================================================== */
-
-const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-const today=new Date().toISOString().slice(0,10);
+/* ================= INZAKI GROUP — Charcoal Business Portal (Online/Supabase) ================= */
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
 $$('input[type=date]').forEach(x=>x.value=today);
 
 let S={raw:[],batches:[],sales:[],expenses:[]};
 let isAdmin=false;
 const ADMIN_PAGES=['raw','batch','sales','expenses'];
 
-const configOk=typeof SUPABASE_URL!=='undefined'&&SUPABASE_URL&&
-  !SUPABASE_URL.includes('YOUR-PROJECT')&&
-  typeof SUPABASE_ANON_KEY!=='undefined'&&SUPABASE_ANON_KEY&&
-  !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+/* ---- Supabase client ---- */
+const configOk = typeof SUPABASE_URL!=='undefined' && SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && typeof SUPABASE_ANON_KEY!=='undefined' && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+const sb = (configOk && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+if(!configOk){$('#configBanner').classList.add('show')}
 
-const sb=(configOk&&window.supabase)
-  ?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY)
-  :null;
-
-if(!configOk&&$('#configBanner'))
-  $('#configBanner').classList.add('show');
-
-const rp=n=>new Intl.NumberFormat('id-ID',{
-  style:'currency',
-  currency:'IDR',
-  maximumFractionDigits:0
-}).format(+n||0);
-
-const kg=n=>(+n||0).toLocaleString('id-ID',{
-  maximumFractionDigits:2
-})+' kg';
-
-const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({
-  '&':'&amp;',
-  '<':'&lt;',
-  '>':'&gt;',
-  '"':'&quot;',
-  "'":'&#39;'
-}[m]));
-
-const day=d=>new Date(String(d||'')+'T00:00:00');
-
-const last7=d=>{
-  let s=new Date();
-  s.setHours(0,0,0,0);
-  s.setDate(s.getDate()-6);
-  return day(d)>=s;
-};
-
-const thisMonth=d=>{
-  let n=new Date(),x=day(d);
-  return x.getFullYear()===n.getFullYear() &&
-         x.getMonth()===n.getMonth();
-};
-
+/* ---- Helpers (formatting) ---- */
+const rp=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(+n||0),kg=n=>(+n||0).toLocaleString('id-ID',{maximumFractionDigits:2})+' kg',esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])),landed=r=>(+r.price||0)+((+r.transport||0)+(+r.other||0))/(+r.originalQty||+r.qty||1),day=d=>new Date(d+'T00:00:00'),last7=d=>{let s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-6);return day(d)>=s},thisMonth=d=>{let n=new Date(),x=day(d);return x.getFullYear()==n.getFullYear()&&x.getMonth()==n.getMonth()};
 const signed=n=>`<span class="${(+n||0)<0?'neg':'pos'}">${rp(n)}</span>`;
+function B(id){return S.batches.find(x=>x.id==id)}
+function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
+function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
+function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih dahulu.');return false}return true}
 
-const B=id=>S.batches.find(x=>String(x.id)===String(id));
+/* ---- DB <-> JS field mapping (snake_case <-> camelCase) ---- */
+const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.original_qty,price:+r.price,transport:+r.transport,other:+r.other,supplier:r.supplier});
+const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note});
+const mapSale=x=>({id:x.id,date:x.date,batchId:x.batch_id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status});
+const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
 
-const sold=id=>S.sales
-  .filter(x=>String(x.batchId)===String(id))
-  .reduce((a,x)=>a+x.qty,0);
-
-const empty=n=>`<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`;
-
-function requireAdmin(){
-  if(!isAdmin){
-    alert('Silakan login sebagai admin terlebih dahulu.');
-    return false;
-  }
-  return true;
-}
-
-function validUuid(v){
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-    .test(String(v||''));
-}
-
-function landed(r){
-  const q=+r.originalQty||+r.qty||+r.stock||1;
-  return (+r.price||+r.purchasePrice||0)
-    +((+r.transport||0)+(+r.other||0))/q;
-}
-
-function parseInvoice(v){
-  const s=String(v||'');
-  const m=s.match(/^INV-(\d{8})-(\d+)\|BATCH=(.*?)\|CUSTOMER=(.*)$/);
-
-  return m
-    ? {
-        batchCode:m[3],
-        customer:m[4],
-        invoice:s
-      }
-    : {
-        batchCode:'',
-        customer:'',
-        invoice:s
-      };
-}
-
-function makeInvoice(date,batch,customer){
-  const d=String(date||'').replaceAll('-','');
-
-  return `INV-${d}-${Date.now().toString().slice(-6)}|BATCH=${batch?.code||''}|CUSTOMER=${customer||''}`;
-}
-
-
-/* ================= DB -> JS MAPPING ================= */
-
-const mapRaw=r=>({
-  id:r.id,
-  date:r.date,
-  name:r.name,
-  qty:+(r.qty??r.stock??0),
-  originalQty:+(r.original_qty??r.qty??r.stock??0),
-  price:+(r.price??r.purchase_price??0),
-  purchasePrice:+(r.purchase_price??r.price??0),
-  transport:+(r.transport??0),
-  other:+(r.other??0),
-  supplier:r.supplier
-});
-
-const mapBatch=b=>({
-  id:b.id,
-  code:b.code,
-  date:b.date,
-  rawId:b.raw_id,
-  rawName:b.raw_name,
-  input:+b.input||0,
-  output:+b.output||0,
-  loss:+b.loss||0,
-  lossPct:+b.loss_pct||0,
-  totalHpp:+b.total_hpp||0,
-  hppkg:+b.hpp_kg||0,
-  labor:+b.labor||0,
-  energy:+b.energy||0,
-  other:+b.other||0,
-  note:b.note
-});
-
-const mapSale=x=>{
-  const p=parseInvoice(x.invoice_no);
-
-  return {
-    id:x.id,
-    date:x.sale_date,
-    batchId:null,
-    batchCode:p.batchCode,
-    customer:p.customer,
-    customerId:x.customer_id,
-    productId:x.product_id,
-    qty:+x.quantity||0,
-    price:+x.price_per_kg||0,
-    discount:+x.discount||0,
-    total:(+x.quantity||0)*(+x.price_per_kg||0)-(+x.discount||0),
-    status:x.status,
-    invoiceNo:x.invoice_no
-  };
-};
-
-const mapExpense=x=>({
-  id:x.id,
-  date:x.date,
-  cat:x.cat,
-  desc:x.desc,
-  amount:+x.amount||0
-});
-
-
-/* ================= LOAD ================= */
-
+/* ---- Load all data from Supabase ---- */
 async function loadAll(){
-
   if(!sb)return;
-
-  const [a,b,c,d]=await Promise.all([
-    sb.from('raw_materials')
-      .select('*')
-      .order('created_at',{ascending:true}),
-
-    sb.from('batches')
-      .select('*')
-      .order('id',{ascending:true}),
-
-    sb.from('sales')
-      .select('*')
-      .order('created_at',{ascending:true}),
-
-    sb.from('expenses')
-      .select('*')
-      .order('id',{ascending:true})
+  const [{data:raw,error:e1},{data:batches,error:e2},{data:sales,error:e3},{data:expenses,error:e4}]=await Promise.all([
+    sb.from('raw_materials').select('*').order('id'),
+    sb.from('batches').select('*').order('id'),
+    sb.from('sales').select('*').order('id'),
+    sb.from('expenses').select('*').order('id')
   ]);
-
-  if(a.error)console.error('raw_materials:',a.error);
-  if(b.error)console.error('batches:',b.error);
-  if(c.error)console.error('sales:',c.error);
-  if(d.error)console.error('expenses:',d.error);
-
-  if(a.error||b.error||c.error||d.error){
-
-    const err=a.error||b.error||c.error||d.error;
-
-    alert('Gagal membaca database: '+err.message);
-
-    return false;
-  }
-
-  S.raw=(a.data||[]).map(mapRaw);
-  S.batches=(b.data||[]).map(mapBatch);
-  S.sales=(c.data||[]).map(mapSale);
-  S.expenses=(d.data||[]).map(mapExpense);
-
-  return true;
+  if(e1||e2||e3||e4){console.error(e1||e2||e3||e4);return}
+  S.raw=(raw||[]).map(mapRaw);S.batches=(batches||[]).map(mapBatch);S.sales=(sales||[]).map(mapSale);S.expenses=(expenses||[]).map(mapExpense);
 }
 
-
-/* ================= REALTIME ================= */
-
+/* ---- Realtime sync across devices ---- */
 let refetchTimer=null;
-
-function scheduleRefetch(){
-
-  clearTimeout(refetchTimer);
-
-  refetchTimer=setTimeout(async()=>{
-    await loadAll();
-    render();
-  },400);
-}
-
+function scheduleRefetch(){clearTimeout(refetchTimer);refetchTimer=setTimeout(async()=>{await loadAll();render()},300)}
 function subscribeRealtime(){
-
   if(!sb)return;
-
   sb.channel('inzaki-live')
-
-    .on(
-      'postgres_changes',
-      {
-        event:'*',
-        schema:'public',
-        table:'raw_materials'
-      },
-      scheduleRefetch
-    )
-
-    .on(
-      'postgres_changes',
-      {
-        event:'*',
-        schema:'public',
-        table:'batches'
-      },
-      scheduleRefetch
-    )
-
-    .on(
-      'postgres_changes',
-      {
-        event:'*',
-        schema:'public',
-        table:'sales'
-      },
-      scheduleRefetch
-    )
-
-    .on(
-      'postgres_changes',
-      {
-        event:'*',
-        schema:'public',
-        table:'expenses'
-      },
-      scheduleRefetch
-    )
-
+    .on('postgres_changes',{event:'*',schema:'public',table:'raw_materials'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'batches'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'sales'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'expenses'},scheduleRefetch)
     .subscribe();
 }
 
-
-/* ================= AUTH ================= */
-
-function applyAdminVisibility(){
-
-  $$('.admin-only')
-    .forEach(el=>el.style.display=isAdmin?'':'none');
-}
-
+/* ---- Auth ---- */
+function applyAdminVisibility(){$$('.admin-only').forEach(el=>{el.style.display=isAdmin?'':'none'})}
 function applyAuthState(session){
-
   isAdmin=!!session;
-
   document.body.classList.toggle('is-admin',isAdmin);
-
   applyAdminVisibility();
-
-  if($('#loginBtn'))
-    $('#loginBtn').style.display=isAdmin?'none':'block';
-
-  if($('#logoutBtn'))
-    $('#logoutBtn').style.display=isAdmin?'block':'none';
-
-  if($('#authStatus'))
-    $('#authStatus').textContent=isAdmin
-      ?('🟢 Admin — '+session.user.email)
-      :'🔒 Mode Publik — lihat saja';
+  $('#loginBtn').style.display=isAdmin?'none':'block';
+  $('#logoutBtn').style.display=isAdmin?'block':'none';
+  $('#authStatus').textContent=isAdmin?('🟢 Admin — '+session.user.email):'🔒 Mode Publik — lihat saja';
 }
-
 async function initAuth(){
-
   if(!sb)return;
-
   const {data:{session}}=await sb.auth.getSession();
-
   applyAuthState(session);
-
-  sb.auth.onAuthStateChange((_event,s)=>{
-    applyAuthState(s);
-  });
+  sb.auth.onAuthStateChange((_event,session)=>applyAuthState(session));
 }
 
-
-/* ================= NAVIGATION ================= */
-
-function go(p){
-
-  if(ADMIN_PAGES.includes(p)&&!isAdmin)
-    p='dashboard';
-
-  $$('.page')
-    .forEach(x=>x.classList.toggle('active',x.id===p));
-
-  $$('nav button')
-    .forEach(x=>x.classList.toggle(
-      'active',
-      x.dataset.page===p
-    ));
-
-  const title=
-    p==='dashboard'?'Dashboard Global':
-    p==='raw'?'Bahan Baku':
-    p==='batch'?'Produksi Batch':
-    p==='finished'?'Barang Jadi':
-    p==='reports'?'Laba & Laporan':
-    p[0].toUpperCase()+p.slice(1);
-
-  if($('#title'))
-    $('#title').textContent=title;
-
-  if($('#modal'))
-    $('#modal').classList.remove('show');
+/* ---- Charts ---- */
+let financeChart=null,productionChart=null;
+const PALETTE={ember:'#FF6A2E',gold:'#E8B84B',red:'#F4685A',green:'#3FCE83',ink:'#F2EFE8',muted:'#8D958F',grid:'#20241F'};
+function drawCharts(){
+ if(typeof Chart==='undefined')return;
+ Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
+ const sel=$('#chartYear');if(!sel)return;
+ const years=new Set([new Date().getFullYear()]);
+ [...S.sales,...S.expenses,...S.batches].forEach(x=>{if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())});
+ const old=+sel.value||new Date().getFullYear();
+ sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+ sel.value=years.has(old)?old:new Date().getFullYear();
+ const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
+ const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
+ S.sales.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){let i=d.getMonth(),b=B(x.batchId);omzet[i]+=+x.total||0;if(b)hpp[i]+=(+x.qty||0)*b.hppkg}});
+ S.expenses.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0});
+ S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
+ for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
+ const grid={color:PALETTE.grid};
+ if(financeChart)financeChart.destroy();
+ financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[
+   {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2,pointBackgroundColor:PALETTE.gold},
+   {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.muted,backgroundColor:PALETTE.muted,pointRadius:0},
+   {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,backgroundColor:PALETTE.red,pointRadius:0},
+   {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(255,106,46,.12)',fill:true,pointRadius:2,pointBackgroundColor:PALETTE.ember}
+ ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{grid,ticks:{callback:v=>rp(v)}}}}});
+ if(productionChart)productionChart.destroy();
+ productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels,datasets:[
+   {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
+   {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
+ ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{beginAtZero:true,grid,ticks:{callback:v=>v+' kg'}}}}});
 }
 
-$$('nav button')
-  .forEach(x=>x.onclick=()=>go(x.dataset.page));
-
-if($('#quick'))
-  $('#quick').onclick=()=>{
-    if(requireAdmin())
-      $('#modal').classList.add('show');
-  };
-
-$$('#modal [data-go]')
-  .forEach(x=>x.onclick=()=>go(x.dataset.go));
-
-
-/* ================= RAW MATERIAL ================= */
-
-function rawPreview(){
-
-  const f=$('#rawForm');
-
-  if(!f)return;
-
-  const q=+f.qty.value||0;
-  const p=+f.price.value||0;
-  const t=+f.transport.value||0;
-  const o=+f.other.value||0;
-
-  if($('#rawTotal'))
-    $('#rawTotal').textContent=rp(q*p+t+o);
+/* ---- Render ---- */
+function render(){
+let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=S.batches.reduce((a,x)=>a+x.output,0),inp=S.batches.reduce((a,x)=>a+x.input,0),loss=inp-out;
+let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
+let ws=S.sales.filter(x=>last7(x.date)),ms=S.sales.filter(x=>thisMonth(x.date)),we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
+let wc=ws.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),mc=ms.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0);
+$('#dRawQty').textContent=kg(rawQty);$('#dRawValue').textContent=rp(rawValue);$('#dFinishedQty').textContent=kg(finishedQty);$('#dFinishedValue').textContent=rp(finishedValue);
+$('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
+$('#dInput').textContent=kg(inp);$('#dOutput').textContent=kg(out);$('#dLoss').textContent=kg(loss);$('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
+$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td></tr>`).join('')||empty(8);
+$('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
+$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td></tr>`).join('')||empty(8);
+$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
+let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(6);
+$('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer)}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td></tr>`}).join('')||empty(7);
+$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td></tr>`).join('')||empty(4);
+$('#profitTable').innerHTML=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return `<tr><td>${b.code}</td><td>${kg(b.output)}</td><td>${kg(q)}</td><td>${rp(om)}</td><td>${rp(hc)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td></tr>`}).join('')||empty(7);
+let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
+$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div>`;
+$('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.rawName)}<br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
+ drawCharts();
 }
 
-['qty','price','transport','other']
-.forEach(n=>{
+/* ---- Navigation ---- */
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+$$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
+$('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
+$$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
 
-  const el=document.querySelector(
-    `#rawForm [name="${n}"]`
-  );
-
-  if(el)
-    el.addEventListener('input',rawPreview);
-});
-
-rawPreview();
-
-if($('#rawForm'))
+/* ---- Raw material form ---- */
+function rawPreview(){let f=$('#rawForm'),q=+f.qty.value||0,p=+f.price.value||0,t=+f.transport.value||0,o=+f.other.value||0;$('#rawTotal').textContent=rp(q*p+t+o)}
+['qty','price','transport','other'].forEach(n=>document.querySelector(`#rawForm [name="${n}"]`).addEventListener('input',rawPreview));rawPreview();
 $('#rawForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  const x=Object.fromEntries(new FormData(e.target));
-  const q=+x.qty;
-
-  if(q<=0)
-    return alert('Qty bahan baku harus lebih dari 0.');
-
-  const payload={
-    date:x.date,
-    name:x.name,
-    qty:q,
-    original_qty:q,
-    price:+x.price||0,
-    transport:+x.transport||0,
-    other:+x.other||0,
-    supplier:x.supplier||null
-  };
-
-  const {data,error}=await sb
-    .from('raw_materials')
-    .insert(payload)
-    .select()
-    .single();
-
-  if(error)
-    return alert(
-      'Gagal simpan bahan baku: '+error.message
-    );
-
-  S.raw.push(mapRaw(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
-  rawPreview();
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),q=+x.qty;
+  if(q<=0)return alert('Qty bahan baku harus lebih dari 0.');
+  const payload={date:x.date,name:x.name,qty:q,original_qty:q,price:+x.price||0,transport:+x.transport||0,other:+x.other||0,supplier:x.supplier||null};
+  const {data,error}=await sb.from('raw_materials').insert(payload).select().single();
+  if(error)return alert('Gagal simpan: '+error.message);
+  S.raw.push(mapRaw(data));render();e.target.reset();e.target.date.value=today;rawPreview();
   alert('Bahan baku berhasil dicatat.');
 };
 
-
-/* ================= BATCH ================= */
-
-if($('#batchForm'))
+/* ---- Batch production form ---- */
 $('#batchForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  const x=Object.fromEntries(new FormData(e.target));
-
-  const r=S.raw.find(
-    z=>String(z.id)===String(x.rawId)
-  );
-
-  const input=+x.inputQty;
-  const output=+x.outputQty;
-
-  if(!r||input<=0||input>r.qty)
-    return alert('Stok bahan baku tidak mencukupi.');
-
-  if(output<=0||output>input)
-    return alert(
-      'Hasil produksi harus lebih dari 0 dan tidak boleh melebihi input.'
-    );
-
-  const material=input*landed(r);
-
-  const total=
-    material+
-    (+x.labor||0)+
-    (+x.energy||0)+
-    (+x.other||0);
-
-  const loss=input-output;
-
-  const year=String(x.date).slice(0,4);
-
-  const n=
-    S.batches.filter(
-      z=>String(z.code).startsWith(`BCH-${year}-`)
-    ).length+1;
-
-  const payload={
-    code:`BCH-${year}-${String(n).padStart(3,'0')}`,
-    date:x.date,
-    raw_id:r.id,
-    raw_name:r.name,
-    input,
-    output,
-    loss,
-    loss_pct:loss/input*100,
-    total_hpp:total,
-    hpp_kg:total/output,
-    labor:+x.labor||0,
-    energy:+x.energy||0,
-    other:+x.other||0,
-    note:x.note||null
-  };
-
-  const {data,error}=await sb
-    .from('batches')
-    .insert(payload)
-    .select()
-    .single();
-
-  if(error)
-    return alert(
-      'Gagal simpan batch: '+error.message
-    );
-
-  const newQty=r.qty-input;
-
-  const {error:e2}=await sb
-    .from('raw_materials')
-    .update({qty:newQty})
-    .eq('id',r.id);
-
-  if(e2)
-    return alert(
-      'Batch tersimpan, tetapi stok bahan gagal diperbarui: '+e2.message
-    );
-
-  r.qty=newQty;
-
-  S.batches.push(mapBatch(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),r=S.raw.find(z=>z.id==x.rawId);
+  if(!r||+x.inputQty>r.qty)return alert('Stok bahan baku tidak mencukupi.');
+  if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');
+  let material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;
+  const payload={code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note||null};
+  const {data,error}=await sb.from('batches').insert(payload).select().single();
+  if(error)return alert('Gagal simpan batch: '+error.message);
+  const newQty=r.qty-+x.inputQty;
+  const {error:e2}=await sb.from('raw_materials').update({qty:newQty}).eq('id',r.id);
+  if(e2)return alert('Batch tersimpan, tapi gagal update stok bahan: '+e2.message);
+  r.qty=newQty;S.batches.push(mapBatch(data));render();e.target.reset();e.target.date.value=today;
   alert('Batch produksi berhasil dibuat.');
 };
 
-
-/* ================= SALES ================= */
-
-if($('#salesForm'))
+/* ---- Sales form ---- */
 $('#salesForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  const x=Object.fromEntries(new FormData(e.target));
-
-  const b=B(x.batchId);
-  const qty=+x.qty;
-  const price=+x.price;
-
-  if(!b)
-    return alert('Batch tidak ditemukan.');
-
-  if(qty<=0)
-    return alert(
-      'Qty penjualan harus lebih dari 0.'
-    );
-
-  const remaining=
-    b.output-sold(b.id);
-
-  if(qty>remaining)
-    return alert(
-      `Stok batch tidak mencukupi. Sisa: ${kg(remaining)}`
-    );
-
-  if(price<0)
-    return alert('Harga jual tidak valid.');
-
-
-  /*
-    Struktur sales Supabase sekarang:
-
-    id             uuid
-    invoice_no     text
-    customer_id    uuid
-    product_id     uuid
-    sale_date      date
-    quantity       numeric
-    price_per_kg   numeric
-    discount       numeric
-    status         text
-
-    Form aplikasi menyediakan nama pelanggan,
-    bukan UUID customer_id.
-
-    Karena itu nama pelanggan TIDAK dimasukkan
-    ke customer_id.
-  */
-
-  const invoiceNo=
-    makeInvoice(
-      x.date,
-      b,
-      x.customer
-    );
-
-  const payload={
-    invoice_no:invoiceNo,
-    sale_date:x.date,
-    quantity:qty,
-    price_per_kg:price,
-    discount:0,
-    status:x.status||'Lunas'
-  };
-
-
-  /*
-    Hanya kirim customer_id/product_id
-    jika benar-benar UUID.
-  */
-
-  if(validUuid(x.customerId))
-    payload.customer_id=x.customerId;
-
-  if(validUuid(x.productId))
-    payload.product_id=x.productId;
-
-
-  const {data,error}=await sb
-    .from('sales')
-    .insert(payload)
-    .select()
-    .single();
-
-  if(error){
-
-    const msg=String(error.message||'');
-
-    if(
-      /customer_id|product_id|not-null|null value/i
-      .test(msg)
-    ){
-
-      return alert(
-        'Penjualan gagal karena kolom customer_id/product_id pada tabel sales wajib diisi. '+
-        'Kolom tersebut membutuhkan UUID, bukan nama pelanggan seperti "Sukabumi".'
-      );
-    }
-
-    return alert(
-      'Gagal simpan penjualan: '+msg
-    );
-  }
-
-  S.sales.push(mapSale(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),b=B(x.batchId);
+  if(!b||+x.qty>b.output-sold(b.id))return alert('Stok batch tidak mencukupi.');
+  const payload={date:x.date,batch_id:b.id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.qty*+x.price,status:x.status};
+  const {data,error}=await sb.from('sales').insert(payload).select().single();
+  if(error)return alert('Gagal simpan penjualan: '+error.message);
+  S.sales.push(mapSale(data));render();e.target.reset();e.target.date.value=today;
   alert('Penjualan berhasil dicatat.');
 };
 
-
-/* ================= EXPENSES ================= */
-
-if($('#expenseForm'))
+/* ---- Expenses form ---- */
 $('#expenseForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  const x=Object.fromEntries(
-    new FormData(e.target)
-  );
-
-  const payload={
-    date:x.date,
-    cat:x.cat,
-    desc:x.desc,
-    amount:+x.amount||0
-  };
-
-  const {data,error}=await sb
-    .from('expenses')
-    .insert(payload)
-    .select()
-    .single();
-
-  if(error)
-    return alert(
-      'Gagal simpan pengeluaran: '+error.message
-    );
-
-  S.expenses.push(mapExpense(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target));
+  const payload={date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount};
+  const {data,error}=await sb.from('expenses').insert(payload).select().single();
+  if(error)return alert('Gagal simpan pengeluaran: '+error.message);
+  S.expenses.push(mapExpense(data));render();e.target.reset();e.target.date.value=today;
   alert('Pengeluaran berhasil dicatat.');
 };
 
-
-/* ================= BACKUP ================= */
-
-if($('#backup'))
-$('#backup').onclick=()=>{
-
-  const a=document.createElement('a');
-
-  a.href=URL.createObjectURL(
-    new Blob(
-      [JSON.stringify(S,null,2)],
-      {type:'application/json'}
-    )
-  );
-
-  a.download='inzaki-charcoal-backup.json';
-
-  a.click();
-};
-
-
-/* ================= RESET ================= */
-
-if($('#reset'))
+/* ---- Backup / Reset ---- */
+$('#backup').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='inzaki-charcoal-backup.json';a.click()};
 $('#reset').onclick=async()=>{
-
   if(!requireAdmin())return;
-
-  if(!confirm(
-    'Hapus SEMUA data dari server untuk semua orang? Tindakan ini tidak bisa dibatalkan.'
-  ))
-    return;
-
-  const jobs=[
-    sb.from('sales')
-      .delete()
-      .not('id','is',null),
-
-    sb.from('batches')
-      .delete()
-      .not('id','is',null),
-
-    sb.from('raw_materials')
-      .delete()
-      .not('id','is',null),
-
-    sb.from('expenses')
-      .delete()
-      .not('id','is',null)
-  ];
-
-  const rs=await Promise.all(jobs);
-
-  const err=rs.find(x=>x.error);
-
-  if(err)
-    return alert(
-      'Gagal menghapus sebagian data: '+
-      err.error.message
-    );
-
-  await loadAll();
-  render();
+  if(!confirm('Hapus SEMUA data dari server untuk semua orang? Tindakan ini tidak bisa dibatalkan.'))return;
+  const {error:e1}=await sb.from('sales').delete().gte('id',0);
+  const {error:e2}=await sb.from('batches').delete().gte('id',0);
+  const {error:e3}=await sb.from('raw_materials').delete().gte('id',0);
+  const {error:e4}=await sb.from('expenses').delete().gte('id',0);
+  if(e1||e2||e3||e4){alert('Gagal menghapus sebagian data: '+(e1||e2||e3||e4).message);}
+  await loadAll();render();
 };
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')drawCharts()});
 
-document.addEventListener(
-  'change',
-  e=>{
-    if(e.target?.id==='chartYear')
-      drawCharts();
-  }
-);
-
-
-/* ================= LOGIN ================= */
-
-if($('#loginBtn'))
-$('#loginBtn').onclick=()=>{
-
-  $('#loginError').textContent='';
-
-  $('#loginModal').classList.add('show');
-};
-
-if($('#loginCancel'))
-$('#loginCancel').onclick=()=>
-  $('#loginModal').classList.remove('show');
-
-if($('#loginForm'))
+/* ---- Login / Logout ---- */
+$('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
+$('#loginCancel').onclick=()=>$('#loginModal').classList.remove('show');
 $('#loginForm').onsubmit=async e=>{
-
   e.preventDefault();
-
-  if(!sb){
-
-    $('#loginError').textContent=
-      'Supabase belum dikonfigurasi.';
-
-    return;
-  }
-
-  const x=Object.fromEntries(
-    new FormData(e.target)
-  );
-
+  if(!sb){$('#loginError').textContent='Supabase belum dikonfigurasi.';return}
+  let x=Object.fromEntries(new FormData(e.target));
   $('#loginError').textContent='Masuk...';
-
-  const {error}=
-    await sb.auth.signInWithPassword({
-      email:x.email,
-      password:x.password
-    });
-
-  if(error){
-
-    $('#loginError').textContent=
-      'Login gagal: '+error.message;
-
-    return;
-  }
-
-  $('#loginError').textContent='';
-
-  $('#loginModal').classList.remove('show');
-
-  e.target.reset();
+  const {error}=await sb.auth.signInWithPassword({email:x.email,password:x.password});
+  if(error){$('#loginError').textContent='Login gagal: '+error.message;return}
+  $('#loginError').textContent='';$('#loginModal').classList.remove('show');e.target.reset();
 };
+$('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')};
 
-if($('#logoutBtn'))
-$('#logoutBtn').onclick=async()=>{
-
-  if(sb)
-    await sb.auth.signOut();
-
-  go('dashboard');
-};
-
-
-/* ================= INIT ================= */
-
+/* ---- Init ---- */
 (async function init(){
-
-  if(!sb){
-
-    render();
-
-    return;
-  }
-
+  if(!sb){render();return}
   await initAuth();
-
   await loadAll();
-
   render();
-
   subscribeRealtime();
-
 })();
