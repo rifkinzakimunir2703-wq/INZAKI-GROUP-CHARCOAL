@@ -22,7 +22,7 @@ function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih
 /* ---- DB <-> JS field mapping (snake_case <-> camelCase) ---- */
 const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.original_qty,price:+r.price,transport:+r.transport,other:+r.other,supplier:r.supplier});
 const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note});
-const mapSale=x=>({id:x.id,date:x.date,batchId:x.batch_id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status});
+const mapSale=x=>({id:x.id,date:x.date,batchId:x.batch_id,customer:x.customer_name||x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status});
 const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
 
 /* ---- Load all data from Supabase ---- */
@@ -116,7 +116,7 @@ $('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}
 $('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
 let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(6);
 $('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
-$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer)}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td></tr>`}).join('')||empty(7);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td></tr>`}).join('')||empty(7);
 $('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td></tr>`).join('')||empty(4);
 $('#profitTable').innerHTML=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return `<tr><td>${b.code}</td><td>${kg(b.output)}</td><td>${kg(q)}</td><td>${rp(om)}</td><td>${rp(hc)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td></tr>`}).join('')||empty(7);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
@@ -167,7 +167,24 @@ $('#salesForm').onsubmit=async e=>{
   e.preventDefault();if(!requireAdmin())return;
   let x=Object.fromEntries(new FormData(e.target)),b=B(x.batchId);
   if(!b||+x.qty>b.output-sold(b.id))return alert('Stok batch tidak mencukupi.');
-  const payload={date:x.date,batch_id:b.id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.qty*+x.price,status:x.status};
+
+  // Buat invoice otomatis
+  const now = new Date();
+  const year = now.getFullYear();
+  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  const invoice_no = `INV-${year}-${random}`;
+
+  const payload={
+    invoice_no: invoice_no,
+    date:x.date,
+    batch_id:b.id,
+    customer_name:x.customer,
+    qty:+x.qty,
+    price:+x.price,
+    total:+x.qty*+x.price,
+    status:x.status
+  };
+
   const {data,error}=await sb.from('sales').insert(payload).select().single();
   if(error)return alert('Gagal simpan penjualan: '+error.message);
   S.sales.push(mapSale(data));render();e.target.reset();e.target.date.value=today;
