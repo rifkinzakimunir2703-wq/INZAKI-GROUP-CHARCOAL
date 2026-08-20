@@ -1,6 +1,28 @@
 const K="inzaki_charcoal_v3";let S=JSON.parse(localStorage.getItem(K)||'{"raw":[],"batches":[],"sales":[],"expenses":[]}');const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);$$('input[type=date]').forEach(x=>x.value=today);
 const rp=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(+n||0),kg=n=>(+n||0).toLocaleString('id-ID',{maximumFractionDigits:2})+' kg',esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])),landed=r=>(+r.price||0)+((+r.transport||0)+(+r.other||0))/(+r.originalQty||+r.qty||1),day=d=>new Date(d+'T00:00:00'),last7=d=>{let s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-6);return day(d)>=s},thisMonth=d=>{let n=new Date(),x=day(d);return x.getFullYear()==n.getFullYear()&&x.getMonth()==n.getMonth()};
 function save(){localStorage.setItem(K,JSON.stringify(S));render()}function B(id){return S.batches.find(x=>x.id==id)}function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
+
+let financeChart=null,productionChart=null;
+function drawCharts(){
+ if(typeof Chart==='undefined')return;
+ const sel=$('#chartYear');if(!sel)return;
+ const years=new Set([new Date().getFullYear()]);
+ [...S.sales,...S.expenses,...S.batches].forEach(x=>{if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())});
+ const old=+sel.value||new Date().getFullYear();
+ sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+ sel.value=years.has(old)?old:new Date().getFullYear();
+ const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
+ const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
+ S.sales.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){let i=d.getMonth(),b=B(x.batchId);omzet[i]+=+x.total||0;if(b)hpp[i]+=(+x.qty||0)*b.hppkg}});
+ S.expenses.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0});
+ S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
+ for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
+ if(financeChart)financeChart.destroy();
+ financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[{label:'Omzet',data:omzet,tension:.35,borderWidth:2},{label:'HPP',data:hpp,tension:.35,borderWidth:2},{label:'Pengeluaran',data:expense,tension:.35,borderWidth:2},{label:'Laba',data:profit,tension:.35,borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>rp(v)}}}}});
+ if(productionChart)productionChart.destroy();
+ productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels,datasets:[{label:'Bahan masuk (kg)',data:input,borderRadius:6},{label:'Barang jadi (kg)',data:output,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{callback:v=>v+' kg'}}}}});
+}
+
 function render(){
 let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=S.batches.reduce((a,x)=>a+x.output,0),inp=S.batches.reduce((a,x)=>a+x.input,0),loss=inp-out;
 let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
@@ -22,6 +44,8 @@ let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)
 $('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${rp(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${rp(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div>`;
 $('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.rawName)}<br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
 }
+ drawCharts();
+}
 function go(p){$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));$('#quick').onclick=()=>$('#modal').classList.add('show');$$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
 function rawPreview(){let f=$('#rawForm'),q=+f.qty.value||0,p=+f.price.value||0,t=+f.transport.value||0,o=+f.other.value||0;$('#rawTotal').textContent=rp(q*p+t+o)}['qty','price','transport','other'].forEach(n=>document.querySelector(`#rawForm [name="${n}"]`).addEventListener('input',rawPreview));rawPreview();
@@ -31,3 +55,4 @@ $('#salesForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new For
 $('#expenseForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new FormData(e.target));S.expenses.push({...x,amount:+x.amount});save();e.target.reset();e.target.date.value=today;alert('Pengeluaran berhasil dicatat.')};
 $('#backup').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='inzaki-charcoal-backup.json';a.click()};
 $('#reset').onclick=()=>{if(confirm('Hapus semua data?')){localStorage.removeItem(K);location.reload()}};render();
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')drawCharts()});

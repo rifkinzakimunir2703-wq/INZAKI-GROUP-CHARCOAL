@@ -17,3 +17,11 @@ Alur: Bahan Baku → Produksi Batch → Penyusutan → HPP → Barang Jadi → P
 
 ## GitHub Pages
 Upload `index.html`, `style.css`, `app.js`, dan `README.md` langsung ke root repository. Aktifkan Settings → Pages → Deploy from a branch → main → /(root).
+
+
+## v4 Modern
+- Tampilan modern minimalis.
+- Phone friendly dan responsive.
+- Grafik keuangan bulanan: omzet, HPP, pengeluaran, laba.
+- Grafik produksi: bahan baku vs barang jadi.
+- Filter tahun grafik.

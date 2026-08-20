@@ -9,6 +9,16 @@
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Pengeluaran Mingguan</span><b id="dExpenseWeek">Rp0</b></div>
 <div><span>Pengeluaran Bulanan</span><b id="dExpenseMonth">Rp0</b></div></div>
+<div class="charts-grid">
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div>
+<canvas id="financeChart"></canvas>
+</div>
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Produksi</h2><small>Bahan baku masuk vs barang jadi</small></div></div>
+<canvas id="productionChart"></canvas>
+</div>
+</div>
 <div class="grid"><div class="panel"><h2>Produksi</h2><div class="stats"><span>Total bahan masuk<b id="dInput">0 kg</b></span><span>Total barang jadi<b id="dOutput">0 kg</b></span><span>Total penyusutan<b id="dLoss">0 kg</b></span><span>Rata-rata penyusutan<b id="dLossPct">0%</b></span></div></div><div class="panel"><h2>Batch Terbaru</h2><div id="recent"></div></div></div></section>
 
 <section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form">
@@ -32,4 +42,4 @@
 
 <section id="reports" class="page"><div class="panel"><h2>Laba per Batch</h2><table><thead><tr><th>Batch</th><th>Output</th><th>Terjual</th><th>Omzet</th><th>HPP Terjual</th><th>Laba</th><th>Margin</th></tr></thead><tbody id="profitTable"></tbody></table></div><div class="panel"><h2>Ringkasan</h2><div class="report" id="report"></div><button class="ghost" id="backup">Backup JSON</button> <button class="danger" id="reset">Hapus Semua Data</button></div></section>
 </main></div>
-<div id="modal" class="modal"><div class="modalbox"><h2>Catat Data</h2><button data-go="raw">Bahan Baku</button><button data-go="batch">Produksi Batch</button><button data-go="sales">Penjualan</button><button data-go="expenses">Pengeluaran</button></div></div><script src="app.js"></script></body></html>
+<div id="modal" class="modal"><div class="modalbox"><h2>Catat Data</h2><button data-go="raw">Bahan Baku</button><button data-go="batch">Produksi Batch</button><button data-go="sales">Penjualan</button><button data-go="expenses">Pengeluaran</button></div></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="app.js"></script></body></html>
