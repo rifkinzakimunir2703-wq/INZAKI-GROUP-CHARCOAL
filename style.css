@@ -84,7 +84,7 @@ h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 4px
 .cards>div{padding:18px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
 .cards>div:hover{transform:translateY(-3px);border-color:rgba(255,106,46,.35);box-shadow:0 16px 34px -14px rgba(255,106,46,.25)}
 .cards span,.stats span,.report span{color:var(--muted);font-size:11.5px;font-weight:600;letter-spacing:.2px;text-transform:uppercase}
-.cards b{display:block;font-family:var(--font-mono);font-weight:700;font-size:23px;margin-top:9px;letter-spacing:.2px;font-variant-numeric:tabular-nums}
+.cards b{display:block;font-family:var(--font-mono);font-weight:700;font-size:26px;margin-top:9px;letter-spacing:.2px;font-variant-numeric:tabular-nums}
 .cards small{display:block;color:var(--muted-2);margin-top:6px;font-size:11.5px}
 .global{grid-template-columns:repeat(3,1fr)}
 .mini{grid-template-columns:repeat(3,1fr)}
@@ -94,21 +94,30 @@ h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 4px
 .stats span{background:var(--surface-2);padding:14px;border-radius:11px;display:block;border:1px solid var(--border-soft)}
 .stats b{display:block;color:var(--ink);font-family:var(--font-mono);font-size:17px;margin-top:6px}
 
-.pos{color:var(--green)}
-.neg{color:var(--red)}
+/* ===== WARNA POSITIF / NEGATIF ===== */
+.pos { color: var(--green) !important; font-weight: 700; }
+.neg { color: var(--red) !important; font-weight: 700; }
 
-/* ---------- Forms ---------- */
-.form{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
-label{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
-input,select{display:block;width:100%;margin-top:7px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--ink);outline:none;font:14px var(--font-body);transition:border-color .15s ease,box-shadow .15s ease}
-input::placeholder{color:var(--muted-2)}
-input:focus,select:focus{border-color:var(--ember);box-shadow:0 0 0 3px rgba(255,106,46,.18)}
-select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) center,calc(100% - 13px) center;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
-.full{grid-column:1/-1}
-.hint{color:var(--muted);font-size:12px;margin-top:-7px}
-.cost{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:11px;padding:12px;align-self:end}
-.cost span,.cost small{display:block;color:var(--muted);font-size:11px}
-.cost b{display:block;font-family:var(--font-mono);font-size:19px;margin:4px 0;color:var(--ember-soft)}
+/* ===== KARTU DASHBOARD (Laba) ===== */
+.cards.global div b.pos,
+.cards.global div b.neg {
+    font-size: 28px !important;
+    font-family: var(--font-mono);
+}
+
+/* ===== TOMBOL HAPUS ===== */
+.btn-delete {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    font-weight: 600;
+}
+.btn-delete:hover { background: #c82333; transform: scale(1.05); }
 
 /* ---------- Tables ---------- */
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -130,6 +139,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .panel-head small{color:var(--muted)}
 .panel-head select{width:auto;min-width:100px;margin:0;padding:8px 26px 8px 12px;font-size:12px}
 
+/* ---------- Forms ---------- */
+.form{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+label{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+input,select{display:block;width:100%;margin-top:7px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--ink);outline:none;font:14px var(--font-body);transition:border-color .15s ease,box-shadow .15s ease}
+input::placeholder{color:var(--muted-2)}
+input:focus,select:focus{border-color:var(--ember);box-shadow:0 0 0 3px rgba(255,106,46,.18)}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) center,calc(100% - 13px) center;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.full{grid-column:1/-1}
+.hint{color:var(--muted);font-size:12px;margin-top:-7px}
+.cost{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:11px;padding:12px;align-self:end}
+.cost span,.cost small{display:block;color:var(--muted);font-size:11px}
+.cost b{display:block;font-family:var(--font-mono);font-size:19px;margin:4px 0;color:var(--ember-soft)}
+
 /* ---------- Modal ---------- */
 .modal{display:none;position:fixed;inset:0;background:rgba(5,6,5,.72);backdrop-filter:blur(3px);align-items:center;justify-content:center;z-index:20}
 .modal.show{display:flex}
@@ -141,7 +163,6 @@ tr:hover td{background:rgba(255,255,255,.02)}
 /* ---------- Responsive ---------- */
 @media(max-width:1050px){.charts-grid{grid-template-columns:1fr}}
 
-/* Below 900px: sidebar becomes a horizontal top bar (mobile-first pattern) */
 @media(max-width:900px){
   .layout{display:block}
   aside{position:static;width:100%;inset:auto;padding:16px 16px 0;border-right:0;border-bottom:1px solid var(--border-soft)}
@@ -172,4 +193,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   .panel-head{align-items:flex-start}
   input,select{font-size:16px;padding:12px}
   th,td{padding:10px 8px}
+  .cards.global div b,
+  .cards.global div b.pos,
+  .cards.global div b.neg { font-size: 22px !important; }
 }
