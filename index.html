@@ -1,7 +1,14 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP — Charcoal Business Portal</title><meta name="theme-color" content="#0A0C0B"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
+<div id="configBanner" class="config-banner"><div class="config-box"><h2>⚠ Supabase belum dikonfigurasi</h2><p>Buka file <code>config.js</code>, isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan data project Supabase kamu, lalu jalankan <code>supabase-schema.sql</code> di SQL Editor. Panduan lengkap ada di <code>README.md</code>.</p></div></div>
 <div class="layout"><aside><div class="brand"><div class="logo"><span>IG</span></div><div class="brand-text"><b>INZAKI<i>GROUP</i></b><small>Charcoal Business Portal</small></div></div><nav>
-<button class="active" data-page="dashboard">⌂ Dashboard</button><button data-page="raw">▣ Bahan Baku</button><button data-page="batch">♨ Produksi Batch</button><button data-page="finished">◈ Barang Jadi</button><button data-page="sales">▤ Penjualan</button><button data-page="expenses">↗ Pengeluaran</button><button data-page="reports">◫ Laba & Laporan</button></nav><small class="foot">Data tersimpan di perangkat ini</small></aside>
-<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary" id="quick">+ Catat</button></header>
+<button class="active" data-page="dashboard">⌂ Dashboard</button><button class="admin-only" data-page="raw">▣ Bahan Baku</button><button class="admin-only" data-page="batch">♨ Produksi Batch</button><button data-page="finished">◈ Barang Jadi</button><button class="admin-only" data-page="sales">▤ Penjualan</button><button class="admin-only" data-page="expenses">↗ Pengeluaran</button><button data-page="reports">◫ Laba & Laporan</button></nav>
+<div class="foot">
+<div id="authStatus" class="auth-status">🔒 Mode Publik — lihat saja</div>
+<button class="ghost small" id="loginBtn">Login Admin</button>
+<button class="ghost small" id="logoutBtn" style="display:none">Logout</button>
+</div>
+</aside>
+<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick">+ Catat</button></header>
 <section id="dashboard" class="page active"><div class="cards global">
 <div><span>Stok Bahan Baku Saat Ini</span><b id="dRawQty">0 kg</b><small id="dRawValue">Rp0</small></div>
 <div><span>Stok Barang Jadi Saat Ini</span><b id="dFinishedQty">0 kg</b><small id="dFinishedValue">Rp0</small></div>
@@ -40,6 +47,16 @@
 
 <section id="expenses" class="page"><div class="panel"><h2>Pengeluaran Umum</h2><form id="expenseForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Kategori<select name=cat><option>Transportasi</option><option>Administrasi</option><option>Packaging</option><option>Maintenance</option><option>Lainnya</option></select></label><label>Deskripsi<input name=desc required></label><label>Jumlah (Rp)<input type=number name=amount min=0 required></label><button class="primary full">Simpan Pengeluaran</button></form></div><div class="panel"><h2>Riwayat Pengeluaran</h2><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Jumlah</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
 
-<section id="reports" class="page"><div class="panel"><h2>Laba per Batch</h2><table><thead><tr><th>Batch</th><th>Output</th><th>Terjual</th><th>Omzet</th><th>HPP Terjual</th><th>Laba</th><th>Margin</th></tr></thead><tbody id="profitTable"></tbody></table></div><div class="panel"><h2>Ringkasan</h2><div class="report" id="report"></div><button class="ghost" id="backup">Backup JSON</button> <button class="danger" id="reset">Hapus Semua Data</button></div></section>
+<section id="reports" class="page"><div class="panel"><h2>Laba per Batch</h2><table><thead><tr><th>Batch</th><th>Output</th><th>Terjual</th><th>Omzet</th><th>HPP Terjual</th><th>Laba</th><th>Margin</th></tr></thead><tbody id="profitTable"></tbody></table></div><div class="panel"><h2>Ringkasan</h2><div class="report" id="report"></div><button class="ghost" id="backup">Backup JSON</button> <button class="danger admin-only" id="reset">Hapus Semua Data</button></div></section>
 </main></div>
-<div id="modal" class="modal"><div class="modalbox"><h2>Catat Data</h2><button data-go="raw">Bahan Baku</button><button data-go="batch">Produksi Batch</button><button data-go="sales">Penjualan</button><button data-go="expenses">Pengeluaran</button></div></div><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="app.js"></script></body></html>
+<div id="modal" class="modal"><div class="modalbox"><h2>Catat Data</h2><button data-go="raw">Bahan Baku</button><button data-go="batch">Produksi Batch</button><button data-go="sales">Penjualan</button><button data-go="expenses">Pengeluaran</button></div></div>
+<div id="loginModal" class="modal"><div class="modalbox"><h2>Login Admin</h2><form id="loginForm" class="form">
+<label class="full">Email<input type=email name=email required autocomplete=username></label>
+<label class="full">Password<input type=password name=password required autocomplete=current-password></label>
+<button class="primary full">Masuk</button></form>
+<p class="login-error" id="loginError"></p>
+<button class="ghost full" id="loginCancel">Batal</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js"></script></body></html>

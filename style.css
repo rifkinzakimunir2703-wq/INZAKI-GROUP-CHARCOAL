@@ -42,7 +42,23 @@ nav{display:grid;gap:4px}
 nav button{border:0;background:none;color:var(--muted);text-align:left;padding:11px 12px;border-radius:10px;cursor:pointer;font:600 13px/1 var(--font-body);letter-spacing:.2px;display:flex;align-items:center;gap:10px;transition:background .15s ease,color .15s ease}
 nav button:hover{background:var(--surface-2);color:var(--ink)}
 nav button.active{background:linear-gradient(90deg,rgba(255,106,46,.16),rgba(255,106,46,.04));color:#fff;box-shadow:inset 3px 0 0 var(--ember)}
-.foot{margin-top:auto;color:var(--muted-2);padding:14px 7px 0;font-size:11px;border-top:1px solid var(--border-soft)}
+.foot{margin-top:auto;padding:14px 7px 0;border-top:1px solid var(--border-soft);display:grid;gap:8px}
+.auth-status{font-size:11.5px;color:var(--muted);font-weight:600}
+body.is-admin .auth-status{color:var(--green)}
+.foot .small{width:100%;padding:9px 10px;font-size:12px;border-radius:9px}
+.login-error{color:var(--red);font-size:12px;min-height:14px;margin:4px 0 0}
+.admin-only{display:none}
+body.is-admin .admin-only{display:inline-flex}
+body.is-admin nav button.admin-only{display:flex}
+body.is-admin .danger.admin-only,body.is-admin .primary.admin-only{display:inline-block}
+
+/* ---------- Config-missing banner ---------- */
+.config-banner{display:none;position:fixed;inset:0;background:rgba(5,6,5,.85);backdrop-filter:blur(4px);z-index:50;align-items:center;justify-content:center;padding:20px}
+.config-banner.show{display:flex}
+.config-box{background:var(--surface);border:1px solid rgba(255,106,46,.35);border-radius:16px;padding:26px;max-width:440px;box-shadow:var(--shadow)}
+.config-box h2{font-family:var(--font-display);color:var(--ember-soft);margin:0 0 10px;font-size:18px}
+.config-box p{color:var(--muted);font-size:13px;line-height:1.7;margin:0}
+.config-box code{background:var(--surface-2);border:1px solid var(--border);padding:1px 6px;border-radius:5px;color:var(--ink);font-family:var(--font-mono);font-size:12px}
 
 /* ---------- Main ---------- */
 main{margin-left:258px;width:calc(100% - 258px);padding:30px 34px;max-width:1560px}
@@ -130,7 +146,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
   .layout{display:block}
   aside{position:static;width:100%;inset:auto;padding:16px 16px 0;border-right:0;border-bottom:1px solid var(--border-soft)}
   .brand{border-bottom:0;margin-bottom:14px;padding-bottom:14px}
-  .foot{display:none}
+  .foot{border-top:0;flex-direction:row;grid-auto-flow:column;align-items:center;justify-content:space-between;padding:0 0 12px;grid-template-columns:1fr auto auto}
+  .foot .small{width:auto}
   nav{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px 14px;-ms-overflow-style:none;scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
   nav button{flex:0 0 auto;white-space:nowrap;padding:10px 15px;background:var(--surface-2);border:1px solid var(--border-soft)}

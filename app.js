@@ -1,8 +1,74 @@
-const K="inzaki_charcoal_v3";let S=JSON.parse(localStorage.getItem(K)||'{"raw":[],"batches":[],"sales":[],"expenses":[]}');const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);$$('input[type=date]').forEach(x=>x.value=today);
+/* ================= INZAKI GROUP — Charcoal Business Portal (Online/Supabase) ================= */
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
+$$('input[type=date]').forEach(x=>x.value=today);
+
+let S={raw:[],batches:[],sales:[],expenses:[]};
+let isAdmin=false;
+const ADMIN_PAGES=['raw','batch','sales','expenses'];
+
+/* ---- Supabase client ---- */
+const configOk = typeof SUPABASE_URL!=='undefined' && SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && typeof SUPABASE_ANON_KEY!=='undefined' && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+const sb = (configOk && window.supabase) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+if(!configOk){$('#configBanner').classList.add('show')}
+
+/* ---- Helpers (formatting) ---- */
 const rp=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(+n||0),kg=n=>(+n||0).toLocaleString('id-ID',{maximumFractionDigits:2})+' kg',esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])),landed=r=>(+r.price||0)+((+r.transport||0)+(+r.other||0))/(+r.originalQty||+r.qty||1),day=d=>new Date(d+'T00:00:00'),last7=d=>{let s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-6);return day(d)>=s},thisMonth=d=>{let n=new Date(),x=day(d);return x.getFullYear()==n.getFullYear()&&x.getMonth()==n.getMonth()};
 const signed=n=>`<span class="${(+n||0)<0?'neg':'pos'}">${rp(n)}</span>`;
-function save(){localStorage.setItem(K,JSON.stringify(S));render()}function B(id){return S.batches.find(x=>x.id==id)}function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
+function B(id){return S.batches.find(x=>x.id==id)}
+function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
+function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
+function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih dahulu.');return false}return true}
 
+/* ---- DB <-> JS field mapping (snake_case <-> camelCase) ---- */
+const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.original_qty,price:+r.price,transport:+r.transport,other:+r.other,supplier:r.supplier});
+const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note});
+const mapSale=x=>({id:x.id,date:x.date,batchId:x.batch_id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status});
+const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
+
+/* ---- Load all data from Supabase ---- */
+async function loadAll(){
+  if(!sb)return;
+  const [{data:raw,error:e1},{data:batches,error:e2},{data:sales,error:e3},{data:expenses,error:e4}]=await Promise.all([
+    sb.from('raw_materials').select('*').order('id'),
+    sb.from('batches').select('*').order('id'),
+    sb.from('sales').select('*').order('id'),
+    sb.from('expenses').select('*').order('id')
+  ]);
+  if(e1||e2||e3||e4){console.error(e1||e2||e3||e4);return}
+  S.raw=(raw||[]).map(mapRaw);S.batches=(batches||[]).map(mapBatch);S.sales=(sales||[]).map(mapSale);S.expenses=(expenses||[]).map(mapExpense);
+}
+
+/* ---- Realtime sync across devices ---- */
+let refetchTimer=null;
+function scheduleRefetch(){clearTimeout(refetchTimer);refetchTimer=setTimeout(async()=>{await loadAll();render()},300)}
+function subscribeRealtime(){
+  if(!sb)return;
+  sb.channel('inzaki-live')
+    .on('postgres_changes',{event:'*',schema:'public',table:'raw_materials'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'batches'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'sales'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'expenses'},scheduleRefetch)
+    .subscribe();
+}
+
+/* ---- Auth ---- */
+function applyAdminVisibility(){$$('.admin-only').forEach(el=>{el.style.display=isAdmin?'':'none'})}
+function applyAuthState(session){
+  isAdmin=!!session;
+  document.body.classList.toggle('is-admin',isAdmin);
+  applyAdminVisibility();
+  $('#loginBtn').style.display=isAdmin?'none':'block';
+  $('#logoutBtn').style.display=isAdmin?'block':'none';
+  $('#authStatus').textContent=isAdmin?('🟢 Admin — '+session.user.email):'🔒 Mode Publik — lihat saja';
+}
+async function initAuth(){
+  if(!sb)return;
+  const {data:{session}}=await sb.auth.getSession();
+  applyAuthState(session);
+  sb.auth.onAuthStateChange((_event,session)=>applyAuthState(session));
+}
+
+/* ---- Charts ---- */
 let financeChart=null,productionChart=null;
 const PALETTE={ember:'#FF6A2E',gold:'#E8B84B',red:'#F4685A',green:'#3FCE83',ink:'#F2EFE8',muted:'#8D958F',grid:'#20241F'};
 function drawCharts(){
@@ -35,6 +101,7 @@ function drawCharts(){
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{beginAtZero:true,grid,ticks:{callback:v=>v+' kg'}}}}});
 }
 
+/* ---- Render ---- */
 function render(){
 let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=S.batches.reduce((a,x)=>a+x.output,0),inp=S.batches.reduce((a,x)=>a+x.input,0),loss=inp-out;
 let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
@@ -57,13 +124,100 @@ $('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</
 $('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.rawName)}<br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
  drawCharts();
 }
-function go(p){$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
-$$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));$('#quick').onclick=()=>$('#modal').classList.add('show');$$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
-function rawPreview(){let f=$('#rawForm'),q=+f.qty.value||0,p=+f.price.value||0,t=+f.transport.value||0,o=+f.other.value||0;$('#rawTotal').textContent=rp(q*p+t+o)}['qty','price','transport','other'].forEach(n=>document.querySelector(`#rawForm [name="${n}"]`).addEventListener('input',rawPreview));rawPreview();
-$('#rawForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new FormData(e.target)),q=+x.qty;if(q<=0)return alert('Qty bahan baku harus lebih dari 0.');S.raw.push({id:Date.now(),date:x.date,name:x.name,qty:q,originalQty:q,price:+x.price||0,transport:+x.transport||0,other:+x.other||0,supplier:x.supplier});save();e.target.reset();e.target.date.value=today;rawPreview();alert('Bahan baku berhasil dicatat.')};
-$('#batchForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new FormData(e.target)),r=S.raw.find(z=>z.id==x.rawId);if(!r||+x.inputQty>r.qty)return alert('Stok bahan baku tidak mencukupi.');if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');let material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;S.batches.push({id:Date.now(),code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,rawId:r.id,rawName:r.name,input:+x.inputQty,output:+x.outputQty,loss,lossPct:loss/+x.inputQty*100,totalHpp:total,hppkg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note});r.qty-=+x.inputQty;save();e.target.reset();e.target.date.value=today;alert('Batch produksi berhasil dibuat.')};
-$('#salesForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new FormData(e.target)),b=B(x.batchId);if(!b||+x.qty>b.output-sold(b.id))return alert('Stok batch tidak mencukupi.');S.sales.push({date:x.date,batchId:b.id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.qty*+x.price,status:x.status});save();e.target.reset();e.target.date.value=today;alert('Penjualan berhasil dicatat.')};
-$('#expenseForm').onsubmit=e=>{e.preventDefault();let x=Object.fromEntries(new FormData(e.target));S.expenses.push({...x,amount:+x.amount});save();e.target.reset();e.target.date.value=today;alert('Pengeluaran berhasil dicatat.')};
+
+/* ---- Navigation ---- */
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+$$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
+$('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
+$$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
+
+/* ---- Raw material form ---- */
+function rawPreview(){let f=$('#rawForm'),q=+f.qty.value||0,p=+f.price.value||0,t=+f.transport.value||0,o=+f.other.value||0;$('#rawTotal').textContent=rp(q*p+t+o)}
+['qty','price','transport','other'].forEach(n=>document.querySelector(`#rawForm [name="${n}"]`).addEventListener('input',rawPreview));rawPreview();
+$('#rawForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),q=+x.qty;
+  if(q<=0)return alert('Qty bahan baku harus lebih dari 0.');
+  const payload={date:x.date,name:x.name,qty:q,original_qty:q,price:+x.price||0,transport:+x.transport||0,other:+x.other||0,supplier:x.supplier||null};
+  const {data,error}=await sb.from('raw_materials').insert(payload).select().single();
+  if(error)return alert('Gagal simpan: '+error.message);
+  S.raw.push(mapRaw(data));render();e.target.reset();e.target.date.value=today;rawPreview();
+  alert('Bahan baku berhasil dicatat.');
+};
+
+/* ---- Batch production form ---- */
+$('#batchForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),r=S.raw.find(z=>z.id==x.rawId);
+  if(!r||+x.inputQty>r.qty)return alert('Stok bahan baku tidak mencukupi.');
+  if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');
+  let material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;
+  const payload={code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note||null};
+  const {data,error}=await sb.from('batches').insert(payload).select().single();
+  if(error)return alert('Gagal simpan batch: '+error.message);
+  const newQty=r.qty-+x.inputQty;
+  const {error:e2}=await sb.from('raw_materials').update({qty:newQty}).eq('id',r.id);
+  if(e2)return alert('Batch tersimpan, tapi gagal update stok bahan: '+e2.message);
+  r.qty=newQty;S.batches.push(mapBatch(data));render();e.target.reset();e.target.date.value=today;
+  alert('Batch produksi berhasil dibuat.');
+};
+
+/* ---- Sales form ---- */
+$('#salesForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),b=B(x.batchId);
+  if(!b||+x.qty>b.output-sold(b.id))return alert('Stok batch tidak mencukupi.');
+  const payload={date:x.date,batch_id:b.id,customer:x.customer,qty:+x.qty,price:+x.price,total:+x.qty*+x.price,status:x.status};
+  const {data,error}=await sb.from('sales').insert(payload).select().single();
+  if(error)return alert('Gagal simpan penjualan: '+error.message);
+  S.sales.push(mapSale(data));render();e.target.reset();e.target.date.value=today;
+  alert('Penjualan berhasil dicatat.');
+};
+
+/* ---- Expenses form ---- */
+$('#expenseForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target));
+  const payload={date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount};
+  const {data,error}=await sb.from('expenses').insert(payload).select().single();
+  if(error)return alert('Gagal simpan pengeluaran: '+error.message);
+  S.expenses.push(mapExpense(data));render();e.target.reset();e.target.date.value=today;
+  alert('Pengeluaran berhasil dicatat.');
+};
+
+/* ---- Backup / Reset ---- */
 $('#backup').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='inzaki-charcoal-backup.json';a.click()};
-$('#reset').onclick=()=>{if(confirm('Hapus semua data?')){localStorage.removeItem(K);location.reload()}};render();
+$('#reset').onclick=async()=>{
+  if(!requireAdmin())return;
+  if(!confirm('Hapus SEMUA data dari server untuk semua orang? Tindakan ini tidak bisa dibatalkan.'))return;
+  const {error:e1}=await sb.from('sales').delete().gte('id',0);
+  const {error:e2}=await sb.from('batches').delete().gte('id',0);
+  const {error:e3}=await sb.from('raw_materials').delete().gte('id',0);
+  const {error:e4}=await sb.from('expenses').delete().gte('id',0);
+  if(e1||e2||e3||e4){alert('Gagal menghapus sebagian data: '+(e1||e2||e3||e4).message);}
+  await loadAll();render();
+};
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')drawCharts()});
+
+/* ---- Login / Logout ---- */
+$('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
+$('#loginCancel').onclick=()=>$('#loginModal').classList.remove('show');
+$('#loginForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!sb){$('#loginError').textContent='Supabase belum dikonfigurasi.';return}
+  let x=Object.fromEntries(new FormData(e.target));
+  $('#loginError').textContent='Masuk...';
+  const {error}=await sb.auth.signInWithPassword({email:x.email,password:x.password});
+  if(error){$('#loginError').textContent='Login gagal: '+error.message;return}
+  $('#loginError').textContent='';$('#loginModal').classList.remove('show');e.target.reset();
+};
+$('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')};
+
+/* ---- Init ---- */
+(async function init(){
+  if(!sb){render();return}
+  await initAuth();
+  await loadAll();
+  render();
+  subscribeRealtime();
+})();
