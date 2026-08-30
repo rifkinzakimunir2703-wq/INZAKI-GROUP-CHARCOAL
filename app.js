@@ -1,6 +1,4 @@
-document.title='Inzaki Group';
-
-/* ================= INZAKI GROUP — Charcoal Business Portal (Online/Supabase) ================= */
+/* ================= INZAKI GROUP — Business Dashboard (Online/Supabase) ================= */
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
 $$('input[type=date]').forEach(x=>x.value=today);
 
@@ -73,930 +71,253 @@ async function initAuth(){
 /* ---- Charts ---- */
 let financeChart=null,productionChart=null;
 const PALETTE={ember:'#FF6A2E',gold:'#E8B84B',red:'#F4685A',green:'#3FCE83',ink:'#F2EFE8',muted:'#8D958F',grid:'#20241F'};
-
 function drawCharts(){
-  if(typeof Chart==='undefined')return;
-  Chart.defaults.color=PALETTE.muted;
-  Chart.defaults.font.family="'Inter',system-ui,sans-serif";
-  Chart.defaults.borderColor=PALETTE.grid;
-
-  const sel=$('#chartYear');
-  if(!sel)return;
-
-  const years=new Set([new Date().getFullYear()]);
-  [...S.sales,...S.expenses,...S.batches].forEach(x=>{
-    if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())
-  });
-
-  const old=+sel.value||new Date().getFullYear();
-  sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
-  sel.value=years.has(old)?old:new Date().getFullYear();
-
-  const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
-  const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
-
-  S.sales.forEach(x=>{
-    let d=new Date(x.date+'T00:00:00');
-    if(d.getFullYear()===year){
-      let i=d.getMonth(),b=B(x.batchId);
-      omzet[i]+=+x.total||0;
-      if(b)hpp[i]+=(+x.qty||0)*b.hppkg
-    }
-  });
-
-  S.expenses.forEach(x=>{
-    let d=new Date(x.date+'T00:00:00');
-    if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0
-  });
-
-  S.batches.forEach(x=>{
-    let d=new Date(x.date+'T00:00:00');
-    if(d.getFullYear()===year){
-      input[d.getMonth()]+=+x.input||0;
-      output[d.getMonth()]+=+x.output||0
-    }
-  });
-
-  for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
-
-  const grid={color:PALETTE.grid};
-
-  if(financeChart)financeChart.destroy();
-
-  financeChart=new Chart($('#financeChart'),{
-    type:'line',
-    data:{
-      labels,
-      datasets:[
-        {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2,pointBackgroundColor:PALETTE.gold},
-        {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.muted,backgroundColor:PALETTE.muted,pointRadius:0},
-        {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,backgroundColor:PALETTE.red,pointRadius:0},
-        {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(255,106,46,.12)',fill:true,pointRadius:2,pointBackgroundColor:PALETTE.ember}
-      ]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{
-          position:'bottom',
-          labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}
-        }
-      },
-      scales:{
-        x:{grid},
-        y:{grid,ticks:{callback:v=>rp(v)}}
-      }
-    }
-  });
-
-  if(productionChart)productionChart.destroy();
-
-  productionChart=new Chart($('#productionChart'),{
-    type:'bar',
-    data:{
-      labels,
-      datasets:[
-        {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
-        {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
-      ]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      plugins:{
-        legend:{
-          position:'bottom',
-          labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}
-        }
-      },
-      scales:{
-        x:{grid},
-        y:{beginAtZero:true,grid,ticks:{callback:v=>v+' kg'}}
-      }
-    }
-  });
-}
-
-/* =========================================================
-   DASHBOARD STOCK
-   BAHAN BAKU:
-   - Kelapa
-   - Tempurung Kelapa
-
-   BAHAN JADI:
-   - Kopra = hasil produksi dari Kelapa
-   - Arang = hasil produksi dari Tempurung Kelapa
-   ========================================================= */
-
-function stockCategory(name){
-  const n=String(name||'').toLowerCase().trim();
-
-  if(n.includes('tempurung')) return 'tempurung';
-
-  if(n.includes('kelapa') || n.includes('coconut')) return 'kelapa';
-
-  return 'lain';
-}
-
-function getFinishedStock(category){
-  return S.batches.reduce((total,b)=>{
-    const cat=stockCategory(b.rawName);
-
-    if(cat!==category)return total;
-
-    return total+Math.max(0,(+b.output||0)-sold(b.id));
-  },0);
-}
-
-function renderDashboardStock(){
-
-  const dash=$('#dashboard');
-
-  if(!dash)return;
-
-  let box=$('#stockDashboard');
-
-  if(!box){
-
-    box=document.createElement('section');
-
-    box.id='stockDashboard';
-
-    box.style.cssText=
-      'margin:0 0 20px;' +
-      'padding:18px;' +
-      'border:1px solid rgba(255,255,255,.08);' +
-      'border-radius:14px;' +
-      'background:rgba(255,255,255,.025);';
-
-    dash.insertBefore(box,dash.firstElementChild);
-  }
-
-  const kelapa=S.raw
-    .filter(r=>stockCategory(r.name)==='kelapa')
-    .reduce((a,r)=>a+(+r.qty||0),0);
-
-  const tempurung=S.raw
-    .filter(r=>stockCategory(r.name)==='tempurung')
-    .reduce((a,r)=>a+(+r.qty||0),0);
-
-  const kopra=getFinishedStock('kelapa');
-
-  const arang=getFinishedStock('tempurung');
-
-  const cards=[
-    ['Stok Kelapa','Bahan Baku',kelapa],
-    ['Stok Tempurung Kelapa','Bahan Baku',tempurung],
-    ['Stok Kopra','Bahan Jadi',kopra],
-    ['Stok Arang','Bahan Jadi',arang]
-  ];
-
-  box.innerHTML=`
-
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-
-      <div>
-
-        <div style="font-size:20px;font-weight:800;">
-          Inzaki Group
-        </div>
-
-        <div style="font-size:12px;opacity:.65;">
-          Ringkasan stok bahan baku & bahan jadi
-        </div>
-
-      </div>
-
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;">
-
-      ${cards.map(([name,type,value])=>`
-
-        <div style="padding:15px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.035);">
-
-          <div style="font-size:12px;opacity:.65;margin-bottom:7px;">
-            ${type}
-          </div>
-
-          <div style="font-size:15px;font-weight:700;margin-bottom:8px;">
-            ${name}
-          </div>
-
-          <div style="font-size:24px;font-weight:800;">
-            ${kg(value)}
-          </div>
-
-        </div>
-
-      `).join('')}
-
-    </div>
-  `;
+ if(typeof Chart==='undefined')return;
+ Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
+ const sel=$('#chartYear');if(!sel)return;
+ const years=new Set([new Date().getFullYear()]);
+ [...S.sales,...S.expenses,...S.batches].forEach(x=>{if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())});
+ const old=+sel.value||new Date().getFullYear();
+ sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+ sel.value=years.has(old)?old:new Date().getFullYear();
+ const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
+ const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
+ S.sales.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){let i=d.getMonth(),b=B(x.batchId);omzet[i]+=+x.total||0;if(b)hpp[i]+=(+x.qty||0)*b.hppkg}});
+ S.expenses.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0});
+ S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
+ for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
+ const grid={color:PALETTE.grid};
+ if(financeChart)financeChart.destroy();
+ financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[
+   {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2,pointBackgroundColor:PALETTE.gold},
+   {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.muted,backgroundColor:PALETTE.muted,pointRadius:0},
+   {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,backgroundColor:PALETTE.red,pointRadius:0},
+   {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(255,106,46,.12)',fill:true,pointRadius:2,pointBackgroundColor:PALETTE.ember}
+ ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{grid,ticks:{callback:v=>rp(v)}}}}});
+ if(productionChart)productionChart.destroy();
+ productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels,datasets:[
+   {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
+   {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
+ ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{beginAtZero:true,grid,ticks:{callback:v=>v+' kg'}}}}});
 }
 
 /* ---- Render ---- */
 function render(){
-
-  let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),
-      rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),
-      out=S.batches.reduce((a,x)=>a+x.output,0),
-      inp=S.batches.reduce((a,x)=>a+x.input,0),
-      loss=inp-out;
-
-  let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),
-      finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
-
-  let ws=S.sales.filter(x=>last7(x.date)),
-      ms=S.sales.filter(x=>thisMonth(x.date)),
-      we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),
-      me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
-
-  let wc=ws.reduce((a,x)=>{
-    let b=B(x.batchId);
-    return a+(b?x.qty*b.hppkg:0)
-  },0);
-
-  let mc=ms.reduce((a,x)=>{
-    let b=B(x.batchId);
-    return a+(b?x.qty*b.hppkg:0)
-  },0);
-
-  $('#dRawQty').textContent=kg(rawQty);
-  $('#dRawValue').textContent=rp(rawValue);
-  $('#dFinishedQty').textContent=kg(finishedQty);
-  $('#dFinishedValue').textContent=rp(finishedValue);
-
-  $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);
-  $('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);
-
-  $('#dExpenseWeek').textContent=rp(we);
-  $('#dExpenseMonth').textContent=rp(me);
-
-  $('#dInput').textContent=kg(inp);
-  $('#dOutput').textContent=kg(out);
-  $('#dLoss').textContent=kg(loss);
-  $('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
-
-  $('#rawTable').innerHTML=S.raw.map(r=>
-    `<tr>
-      <td>${esc(r.name)}</td>
-      <td>${kg(r.qty)}</td>
-      <td>${rp(r.price)}</td>
-      <td>${rp(r.transport)}</td>
-      <td>${rp(r.other)}</td>
-      <td>${rp(landed(r))}</td>
-      <td>${rp(r.qty*landed(r))}</td>
-      <td>${esc(r.supplier||'-')}</td>
-      <td>
-        <button onclick="deleteRaw('${r.id}')"
-          style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">
-          🗑️ Hapus
-        </button>
-      </td>
-    </tr>`
-  ).join('')||empty(9);
-
-  $('#rawSelect').innerHTML=S.raw
-    .filter(r=>r.qty>0)
-    .map(r=>`<option value="${r.id}">
-      ${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg
-    </option>`)
-    .join('');
-
-  $('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>
-    `<tr>
-      <td>${b.code}</td>
-      <td>${b.date}</td>
-      <td>${esc(b.rawName)}</td>
-      <td>${kg(b.input)}</td>
-      <td>${kg(b.output)}</td>
-      <td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td>
-      <td>${rp(b.totalHpp)}</td>
-      <td>${rp(b.hppkg)}</td>
-      <td>
-        <button onclick="deleteBatch('${b.id}')"
-          style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">
-          🗑️ Hapus
-        </button>
-      </td>
-    </tr>`
-  ).join('')||empty(9);
-
-  $('#salesBatch').innerHTML=S.batches
-    .filter(b=>b.output-sold(b.id)>0)
-    .map(b=>`<option value="${b.id}">
-      ${b.code} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg
-    </option>`)
-    .join('');
-
-  let tq=0,tv=0;
-
-  $('#finishedTable').innerHTML=S.batches.map(b=>{
-
-    let q=b.output-sold(b.id);
-
-    tq+=q;
-    tv+=q*b.hppkg;
-
-    return `<tr>
-      <td>${b.code}</td>
-      <td>${esc(b.rawName)}</td>
-      <td>${kg(b.output)}</td>
-      <td>${kg(sold(b.id))}</td>
-      <td>${kg(q)}</td>
-      <td>${rp(b.hppkg)}</td>
-    </tr>`
-
-  }).join('')||empty(6);
-
-  $('#fQty').textContent=kg(tq);
-  $('#fValue').textContent=rp(tv);
-  $('#fAvg').textContent=rp(tq?tv/tq:0);
-
-  $('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{
-
-    let b=B(x.batchId),
-        c=x.qty*(b?b.hppkg:0);
-
-    return `<tr>
-      <td>${x.date}</td>
-      <td>${b?.code||'-'}</td>
-      <td>${esc(x.customer||'')}</td>
-      <td>${kg(x.qty)}</td>
-      <td>${rp(x.total)}</td>
-      <td>${rp(c)}</td>
-      <td>${signed(x.total-c)}</td>
-      <td>
-        <button onclick="deleteSale('${x.id}')"
-          style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">
-          🗑️ Hapus
-        </button>
-      </td>
-    </tr>`
-
-  }).join('')||empty(8);
-
-  $('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>
-    `<tr>
-      <td>${x.date}</td>
-      <td>${x.cat}</td>
-      <td>${esc(x.desc)}</td>
-      <td>${rp(x.amount)}</td>
-      <td>
-        <button onclick="deleteExpense('${x.id}')"
-          style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">
-          🗑️ Hapus
-        </button>
-      </td>
-    </tr>`
-  ).join('')||empty(5);
-
-  $('#profitTable').innerHTML=S.batches.map(b=>{
-
-    let ss=S.sales.filter(x=>x.batchId==b.id),
-        om=ss.reduce((a,x)=>a+x.total,0),
-        q=ss.reduce((a,x)=>a+x.qty,0),
-        hc=q*b.hppkg,
-        l=om-hc;
-
-    return `<tr>
-      <td>${b.code}</td>
-      <td>${kg(b.output)}</td>
-      <td>${kg(q)}</td>
-      <td>${rp(om)}</td>
-      <td>${rp(hc)}</td>
-      <td>${signed(l)}</td>
-      <td>${om?(l/om*100).toFixed(1):0}%</td>
-    </tr>`
-
-  }).join('')||empty(7);
-
-  let totalSales=S.sales.reduce((a,x)=>a+x.total,0),
-      totalCogs=S.sales.reduce((a,x)=>{
-        let b=B(x.batchId);
-        return a+(b?x.qty*b.hppkg:0)
-      },0),
-      totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
-
-  $('#report').innerHTML=`
-    <div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div>
-    <div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div>
-    <div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div>
-    <div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div>
-    <div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div>
-    <div><span>Total batch</span><strong>${S.batches.length}</strong></div>
-  `;
-
-  $('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>
-    `<div style="padding:10px;border-bottom:1px solid #eee">
-      <b>${b.code}</b> · ${esc(b.rawName)}
-      <br>
-      <small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small>
-    </div>`
-  ).join('')||'Belum ada batch.';
-
-  drawCharts();
-
-  /* Update stok dashboard */
-  renderDashboardStock();
+let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=S.batches.reduce((a,x)=>a+x.output,0),inp=S.batches.reduce((a,x)=>a+x.input,0),loss=inp-out;
+let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
+let ws=S.sales.filter(x=>last7(x.date)),ms=S.sales.filter(x=>thisMonth(x.date)),we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
+let wc=ws.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),mc=ms.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0);
+$('#dRawQty').textContent=kg(rawQty);$('#dRawValue').textContent=rp(rawValue);$('#dFinishedQty').textContent=kg(finishedQty);$('#dFinishedValue').textContent=rp(finishedValue);
+/* Rincian per bahan baku (qty & nilai dihitung terpisah per nama bahan, harga masing-masing beda) */
+let rawByName={};S.raw.forEach(r=>{let k=r.name||'(tanpa nama)';if(!rawByName[k])rawByName[k]={qty:0,value:0};rawByName[k].qty+=r.qty;rawByName[k].value+=r.qty*landed(r)});
+$('#dRawBreakdown').innerHTML=Object.keys(rawByName).length?Object.entries(rawByName).map(([name,v])=>`<div class="bd-row"><span>${esc(name)}</span><span>${kg(v.qty)} · ${rp(v.value)}</span></div>`).join(''):'<div class="bd-row bd-empty">Belum ada bahan baku</div>';
+/* Rincian barang jadi per jenis bahan asal batch */
+let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let k=b.rawName||'(tanpa nama)';if(!finByName[k])finByName[k]={qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
+$('#dFinishedBreakdown').innerHTML=Object.keys(finByName).length?Object.entries(finByName).map(([name,v])=>`<div class="bd-row"><span>${esc(name)}</span><span>${kg(v.qty)} · ${rp(v.value)}</span></div>`).join(''):'<div class="bd-row bd-empty">Belum ada barang jadi</div>';
+$('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
+$('#dInput').textContent=kg(inp);$('#dOutput').textContent=kg(out);$('#dLoss').textContent=kg(loss);$('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
+$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td><td><button onclick="deleteRaw('${r.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
+$('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
+$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
+$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
+let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(6);
+$('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td><td><button onclick="deleteSale('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
+$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td><td><button onclick="deleteExpense('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
+$('#profitTable').innerHTML=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return `<tr><td>${b.code}</td><td>${kg(b.output)}</td><td>${kg(q)}</td><td>${rp(om)}</td><td>${rp(hc)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td></tr>`}).join('')||empty(7);
+let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
+$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div>`;
+$('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.rawName)}<br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
+ drawCharts();
 }
 
 /* ---- DELETE FUNCTIONS ---- */
 
 // Hapus Penjualan
 async function deleteSale(id) {
-
-  if (!requireAdmin()) return;
-
-  const sale = S.sales.find(x => x.id === id);
-
-  if (!sale) return alert('Data tidak ditemukan!');
-
-  if (!confirm(
-    `Hapus penjualan?\n\nTanggal: ${sale.date}\nPelanggan: ${sale.customer}\nQTY: ${sale.qty} kg\nTotal: ${rp(sale.total)}\n\nData akan dihapus permanen!`
-  )) return;
-
-  const { error } = await sb.from('sales').delete().eq('id', id);
-
-  if (error) return alert('Gagal hapus: ' + error.message);
-
-  S.sales = S.sales.filter(x => x.id !== id);
-
-  render();
-
-  alert('✅ Penjualan berhasil dihapus!');
+    if (!requireAdmin()) return;
+    const sale = S.sales.find(x => x.id === id);
+    if (!sale) return alert('Data tidak ditemukan!');
+    if (!confirm(`Hapus penjualan?\n\nTanggal: ${sale.date}\nPelanggan: ${sale.customer}\nQTY: ${sale.qty} kg\nTotal: ${rp(sale.total)}\n\nData akan dihapus permanen!`)) return;
+    const { error } = await sb.from('sales').delete().eq('id', id);
+    if (error) return alert('Gagal hapus: ' + error.message);
+    S.sales = S.sales.filter(x => x.id !== id);
+    render();
+    alert('✅ Penjualan berhasil dihapus!');
 }
 
 // Hapus Batch
 async function deleteBatch(id) {
-
-  if (!requireAdmin()) return;
-
-  const batch = S.batches.find(x => x.id === id);
-
-  if (!batch) return alert('Data tidak ditemukan!');
-
-  const hasSales = S.sales.some(x => x.batchId === id);
-
-  if (hasSales) {
-
-    if (!confirm(
-      `⚠️ Batch ${batch.code} sudah memiliki penjualan.\nHapus akan menghapus semua penjualan terkait!\n\nLanjutkan?`
-    )) return;
-
-    for (const sale of S.sales.filter(x => x.batchId === id)) {
-      await sb.from('sales').delete().eq('id', sale.id);
+    if (!requireAdmin()) return;
+    const batch = S.batches.find(x => x.id === id);
+    if (!batch) return alert('Data tidak ditemukan!');
+    const hasSales = S.sales.some(x => x.batchId === id);
+    if (hasSales) {
+        if (!confirm(`⚠️ Batch ${batch.code} sudah memiliki penjualan.\nHapus akan menghapus semua penjualan terkait!\n\nLanjutkan?`)) return;
+        for (const sale of S.sales.filter(x => x.batchId === id)) {
+            await sb.from('sales').delete().eq('id', sale.id);
+        }
+        S.sales = S.sales.filter(x => x.batchId !== id);
     }
-
-    S.sales = S.sales.filter(x => x.batchId !== id);
-  }
-
-  if (!confirm(
-    `Hapus batch?\n\nKode: ${batch.code}\nTanggal: ${batch.date}\nOutput: ${batch.output} kg\n\nData akan dihapus permanen!`
-  )) return;
-
-  if (batch.rawId) {
-
-    const raw = S.raw.find(r => r.id === batch.rawId);
-
-    if (raw) {
-
-      await sb
-        .from('raw_materials')
-        .update({ qty: raw.qty + batch.input })
-        .eq('id', raw.id);
-
-      raw.qty += batch.input;
+    if (!confirm(`Hapus batch?\n\nKode: ${batch.code}\nTanggal: ${batch.date}\nOutput: ${batch.output} kg\n\nData akan dihapus permanen!`)) return;
+    if (batch.rawId) {
+        const raw = S.raw.find(r => r.id === batch.rawId);
+        if (raw) {
+            await sb.from('raw_materials').update({ qty: raw.qty + batch.input }).eq('id', raw.id);
+            raw.qty += batch.input;
+        }
     }
-  }
-
-  const { error } = await sb.from('batches').delete().eq('id', id);
-
-  if (error) return alert('Gagal hapus: ' + error.message);
-
-  S.batches = S.batches.filter(x => x.id !== id);
-
-  render();
-
-  alert('✅ Batch berhasil dihapus!');
+    const { error } = await sb.from('batches').delete().eq('id', id);
+    if (error) return alert('Gagal hapus: ' + error.message);
+    S.batches = S.batches.filter(x => x.id !== id);
+    render();
+    alert('✅ Batch berhasil dihapus!');
 }
 
 // Hapus Bahan Baku
 async function deleteRaw(id) {
-
-  if (!requireAdmin()) return;
-
-  const raw = S.raw.find(x => x.id === id);
-
-  if (!raw) return alert('Data tidak ditemukan!');
-
-  const usedInBatch = S.batches.some(x => x.rawId === id);
-
-  if (usedInBatch) {
-    return alert(
-      '❌ Bahan baku ini sudah digunakan dalam produksi batch, tidak bisa dihapus!'
-    );
-  }
-
-  if (!confirm(
-    `Hapus bahan baku?\n\nNama: ${raw.name}\nQTY: ${raw.qty} kg\n\nData akan dihapus permanen!`
-  )) return;
-
-  const { error } = await sb.from('raw_materials').delete().eq('id', id);
-
-  if (error) return alert('Gagal hapus: ' + error.message);
-
-  S.raw = S.raw.filter(x => x.id !== id);
-
-  render();
-
-  alert('✅ Bahan baku berhasil dihapus!');
+    if (!requireAdmin()) return;
+    const raw = S.raw.find(x => x.id === id);
+    if (!raw) return alert('Data tidak ditemukan!');
+    const usedInBatch = S.batches.some(x => x.rawId === id);
+    if (usedInBatch) {
+        return alert('❌ Bahan baku ini sudah digunakan dalam produksi batch, tidak bisa dihapus!');
+    }
+    if (!confirm(`Hapus bahan baku?\n\nNama: ${raw.name}\nQTY: ${raw.qty} kg\n\nData akan dihapus permanen!`)) return;
+    const { error } = await sb.from('raw_materials').delete().eq('id', id);
+    if (error) return alert('Gagal hapus: ' + error.message);
+    S.raw = S.raw.filter(x => x.id !== id);
+    render();
+    alert('✅ Bahan baku berhasil dihapus!');
 }
 
 // Hapus Pengeluaran
 async function deleteExpense(id) {
-
-  if (!requireAdmin()) return;
-
-  const expense = S.expenses.find(x => x.id === id);
-
-  if (!expense) return alert('Data tidak ditemukan!');
-
-  if (!confirm(
-    `Hapus pengeluaran?\n\nTanggal: ${expense.date}\nKategori: ${expense.cat}\nDeskripsi: ${expense.desc}\nJumlah: ${rp(expense.amount)}\n\nData akan dihapus permanen!`
-  )) return;
-
-  const { error } = await sb.from('expenses').delete().eq('id', id);
-
-  if (error) return alert('Gagal hapus: ' + error.message);
-
-  S.expenses = S.expenses.filter(x => x.id !== id);
-
-  render();
-
-  alert('✅ Pengeluaran berhasil dihapus!');
+    if (!requireAdmin()) return;
+    const expense = S.expenses.find(x => x.id === id);
+    if (!expense) return alert('Data tidak ditemukan!');
+    if (!confirm(`Hapus pengeluaran?\n\nTanggal: ${expense.date}\nKategori: ${expense.cat}\nDeskripsi: ${expense.desc}\nJumlah: ${rp(expense.amount)}\n\nData akan dihapus permanen!`)) return;
+    const { error } = await sb.from('expenses').delete().eq('id', id);
+    if (error) return alert('Gagal hapus: ' + error.message);
+    S.expenses = S.expenses.filter(x => x.id !== id);
+    render();
+    alert('✅ Pengeluaran berhasil dihapus!');
 }
 
 /* ---- Navigation ---- */
-function go(p){
-
-  if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';
-
-  $$('.page').forEach(x=>
-    x.classList.toggle('active',x.id===p)
-  );
-
-  $$('nav button').forEach(x=>
-    x.classList.toggle('active',x.dataset.page===p)
-  );
-
-  $('#title').textContent=
-    p==='dashboard'
-      ?'Inzaki Group'
-      :p==='raw'
-        ?'Bahan Baku'
-        :p==='batch'
-          ?'Produksi Batch'
-          :p==='finished'
-            ?'Barang Jadi'
-            :p==='reports'
-              ?'Laba & Laporan'
-              :p[0].toUpperCase()+p.slice(1);
-
-  $('#modal').classList.remove('show');
-}
-
-$$('nav button').forEach(x=>
-  x.onclick=()=>go(x.dataset.page)
-);
-
-$('#quick').onclick=()=>{
-  if(requireAdmin())$('#modal').classList.add('show')
-};
-
-$$('#modal [data-go]').forEach(x=>
-  x.onclick=()=>go(x.dataset.go)
-);
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+$$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
+$('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
+$$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
 
 /* ---- Raw material form ---- */
-function rawPreview(){
-
-  let f=$('#rawForm'),
-      q=+f.qty.value||0,
-      p=+f.price.value||0,
-      t=+f.transport.value||0,
-      o=+f.other.value||0;
-
-  $('#rawTotal').textContent=rp(q*p+t+o)
-}
-
-['qty','price','transport','other'].forEach(n=>
-  document.querySelector(`#rawForm [name="${n}"]`)
-    .addEventListener('input',rawPreview)
-);
-
-rawPreview();
-
+function rawPreview(){let f=$('#rawForm'),q=+f.qty.value||0,p=+f.price.value||0,t=+f.transport.value||0,o=+f.other.value||0;$('#rawTotal').textContent=rp(q*p+t+o)}
+['qty','price','transport','other'].forEach(n=>document.querySelector(`#rawForm [name="${n}"]`).addEventListener('input',rawPreview));rawPreview();
 $('#rawForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  let x=Object.fromEntries(new FormData(e.target)),
-      q=+x.qty;
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),q=+x.qty;
   if(q<=0)return alert('Qty bahan baku harus lebih dari 0.');
-
-  const payload={
-    date:x.date,
-    name:x.name,
-    qty:q,
-    original_qty:q,
-    price:+x.price||0,
-    transport:+x.transport||0,
-    other:+x.other||0,
-    supplier:x.supplier||null
-  };
-
-  const {data,error}=await sb
-    .from('raw_materials')
-    .insert(payload)
-    .select()
-    .single();
-
+  const payload={date:x.date,name:x.name,qty:q,original_qty:q,price:+x.price||0,transport:+x.transport||0,other:+x.other||0,supplier:x.supplier||null};
+  const {data,error}=await sb.from('raw_materials').insert(payload).select().single();
   if(error)return alert('Gagal simpan: '+error.message);
-
-  S.raw.push(mapRaw(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
-  rawPreview();
-
+  S.raw.push(mapRaw(data));render();e.target.reset();e.target.date.value=today;rawPreview();
   alert('Bahan baku berhasil dicatat.');
 };
 
 /* ---- Batch production form ---- */
 $('#batchForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  let x=Object.fromEntries(new FormData(e.target)),
-      r=S.raw.find(z=>z.id==x.rawId);
-
-  if(!r||+x.inputQty>r.qty)
-    return alert('Stok bahan baku tidak mencukupi.');
-
-  if(+x.outputQty<=0)
-    return alert('Hasil produksi harus lebih dari 0.');
-
-  let material=+x.inputQty*landed(r),
-      total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),
-      loss=+x.inputQty-+x.outputQty,
-      n=S.batches.length+1;
-
-  const payload={
-    code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,
-    date:x.date,
-    raw_id:r.id,
-    raw_name:r.name,
-    input:+x.inputQty,
-    output:+x.outputQty,
-    loss,
-    loss_pct:loss/+x.inputQty*100,
-    total_hpp:total,
-    hpp_kg:total/+x.outputQty,
-    labor:+x.labor||0,
-    energy:+x.energy||0,
-    other:+x.other||0,
-    note:x.note||null
-  };
-
-  const {data,error}=await sb
-    .from('batches')
-    .insert(payload)
-    .select()
-    .single();
-
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),r=S.raw.find(z=>z.id==x.rawId);
+  if(!r||+x.inputQty>r.qty)return alert('Stok bahan baku tidak mencukupi.');
+  if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');
+  let material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;
+  const payload={code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note||null};
+  const {data,error}=await sb.from('batches').insert(payload).select().single();
   if(error)return alert('Gagal simpan batch: '+error.message);
-
   const newQty=r.qty-+x.inputQty;
-
-  const {error:e2}=await sb
-    .from('raw_materials')
-    .update({qty:newQty})
-    .eq('id',r.id);
-
-  if(e2)
-    return alert(
-      'Batch tersimpan, tapi gagal update stok bahan: '+e2.message
-    );
-
-  r.qty=newQty;
-
-  S.batches.push(mapBatch(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  const {error:e2}=await sb.from('raw_materials').update({qty:newQty}).eq('id',r.id);
+  if(e2)return alert('Batch tersimpan, tapi gagal update stok bahan: '+e2.message);
+  r.qty=newQty;S.batches.push(mapBatch(data));render();e.target.reset();e.target.date.value=today;
   alert('Batch produksi berhasil dibuat.');
 };
 
 /* ---- Sales form ---- */
 $('#salesForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target)),b=B(x.batchId);
+  if(!b||+x.qty>b.output-sold(b.id))return alert('Stok batch tidak mencukupi.');
 
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
-  let x=Object.fromEntries(new FormData(e.target)),
-      b=B(x.batchId);
-
-  if(!b||+x.qty>b.output-sold(b.id))
-    return alert('Stok batch tidak mencukupi.');
-
-  let status=x.status||'Lunas';
-
-  if(status!=='Lunas'&&status!=='Piutang'){
-    status='Lunas';
+  let status = x.status || 'Lunas';
+  if (status !== 'Lunas' && status !== 'Piutang') {
+    status = 'Lunas';
   }
 
-  const now=new Date();
-  const year=now.getFullYear();
-  const random=String(Math.floor(Math.random()*1000)).padStart(3,'0');
-  const invoice_no=`INV-${year}-${random}`;
+  const now = new Date();
+  const year = now.getFullYear();
+  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  const invoice_no = `INV-${year}-${random}`;
 
   const payload={
-    invoice_no:invoice_no,
+    invoice_no: invoice_no,
     date:x.date,
     batch_id:b.id,
-    customer_name:x.customer||'Umum',
+    customer_name:x.customer || 'Umum',
     qty:+x.qty,
     price:+x.price,
     total:+x.qty*+x.price,
-    status:status
+    status: status
   };
 
-  const {data,error}=await sb
-    .from('sales')
-    .insert(payload)
-    .select()
-    .single();
-
+  const {data,error}=await sb.from('sales').insert(payload).select().single();
   if(error)return alert('Gagal simpan penjualan: '+error.message);
-
-  S.sales.push(mapSale(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  S.sales.push(mapSale(data));render();e.target.reset();e.target.date.value=today;
   alert('Penjualan berhasil dicatat.');
 };
 
 /* ---- Expenses form ---- */
 $('#expenseForm').onsubmit=async e=>{
-
-  e.preventDefault();
-
-  if(!requireAdmin())return;
-
+  e.preventDefault();if(!requireAdmin())return;
   let x=Object.fromEntries(new FormData(e.target));
-
-  const payload={
-    date:x.date,
-    cat:x.cat,
-    desc:x.desc,
-    amount:+x.amount
-  };
-
-  const {data,error}=await sb
-    .from('expenses')
-    .insert(payload)
-    .select()
-    .single();
-
+  const payload={date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount};
+  const {data,error}=await sb.from('expenses').insert(payload).select().single();
   if(error)return alert('Gagal simpan pengeluaran: '+error.message);
-
-  S.expenses.push(mapExpense(data));
-
-  render();
-
-  e.target.reset();
-  e.target.date.value=today;
-
+  S.expenses.push(mapExpense(data));render();e.target.reset();e.target.date.value=today;
   alert('Pengeluaran berhasil dicatat.');
 };
 
 /* ---- Backup / Reset ---- */
-$('#backup').onclick=()=>{
-  let a=document.createElement('a');
-
-  a.href=URL.createObjectURL(
-    new Blob(
-      [JSON.stringify(S,null,2)],
-      {type:'application/json'}
-    )
-  );
-
-  a.download='inzaki-charcoal-backup.json';
-  a.click();
-};
-
+$('#backup').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='inzaki-group-backup.json';a.click()};
 $('#reset').onclick=async()=>{
-
   if(!requireAdmin())return;
-
-  if(!confirm(
-    'Hapus SEMUA data dari server untuk semua orang? Tindakan ini tidak bisa dibatalkan.'
-  ))return;
-
+  if(!confirm('Hapus SEMUA data dari server untuk semua orang? Tindakan ini tidak bisa dibatalkan.'))return;
   const {error:e1}=await sb.from('sales').delete().gte('id',0);
   const {error:e2}=await sb.from('batches').delete().gte('id',0);
   const {error:e3}=await sb.from('raw_materials').delete().gte('id',0);
   const {error:e4}=await sb.from('expenses').delete().gte('id',0);
-
-  if(e1||e2||e3||e4){
-    alert(
-      'Gagal menghapus sebagian data: '+
-      (e1||e2||e3||e4).message
-    );
-  }
-
-  await loadAll();
-  render();
+  if(e1||e2||e3||e4){alert('Gagal menghapus sebagian data: '+(e1||e2||e3||e4).message);}
+  await loadAll();render();
 };
-
-document.addEventListener('change',e=>{
-  if(e.target&&e.target.id==='chartYear')
-    drawCharts()
-});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')drawCharts()});
 
 /* ---- Login / Logout ---- */
-$('#loginBtn').onclick=()=>{
-  $('#loginError').textContent='';
-  $('#loginModal').classList.add('show')
-};
-
-$('#loginCancel').onclick=()=>{
-  $('#loginModal').classList.remove('show')
-};
-
+$('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
+$('#loginCancel').onclick=()=>$('#loginModal').classList.remove('show');
 $('#loginForm').onsubmit=async e=>{
-
   e.preventDefault();
-
-  if(!sb){
-    $('#loginError').textContent='Supabase belum dikonfigurasi.';
-    return
-  }
-
+  if(!sb){$('#loginError').textContent='Supabase belum dikonfigurasi.';return}
   let x=Object.fromEntries(new FormData(e.target));
-
   $('#loginError').textContent='Masuk...';
-
-  const {error}=await sb.auth.signInWithPassword({
-    email:x.email,
-    password:x.password
-  });
-
-  if(error){
-    $('#loginError').textContent='Login gagal: '+error.message;
-    return
-  }
-
-  $('#loginError').textContent='';
-  $('#loginModal').classList.remove('show');
-  e.target.reset();
+  const {error}=await sb.auth.signInWithPassword({email:x.email,password:x.password});
+  if(error){$('#loginError').textContent='Login gagal: '+error.message;return}
+  $('#loginError').textContent='';$('#loginModal').classList.remove('show');e.target.reset();
 };
-
-$('#logoutBtn').onclick=async()=>{
-  if(sb)await sb.auth.signOut();
-  go('dashboard')
-};
+$('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')};
 
 /* ---- Init ---- */
 (async function init(){
-
-  if(!sb){
-    render();
-    return
-  }
-
+  if(!sb){render();return}
   await initAuth();
   await loadAll();
   render();
   subscribeRealtime();
-
 })();

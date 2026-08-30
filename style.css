@@ -1,4 +1,4 @@
-/* ===== INZAKI GROUP — Charcoal Business Portal v4 · Ember Dark Theme ===== */
+/* ===== INZAKI GROUP — Business Dashboard v5 · Ember Dark Theme ===== */
 *{box-sizing:border-box}
 :root{
   --bg:#0A0C0B;
@@ -62,10 +62,11 @@ body.is-admin .danger.admin-only,body.is-admin .primary.admin-only{display:inlin
 
 /* ---------- Main ---------- */
 main{margin-left:258px;width:calc(100% - 258px);padding:30px 34px;max-width:1560px}
-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;gap:16px}
+header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px;gap:16px;padding-bottom:20px;border-bottom:1px solid var(--border-soft)}
 header>div>small{letter-spacing:2.2px;color:var(--ember-soft);font-weight:700;font-size:10.5px;text-transform:uppercase}
-h1{margin:6px 0 0;font-family:var(--font-display);font-weight:700;font-size:30px;letter-spacing:.2px;color:var(--ink)}
-h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 4px;color:var(--ink)}
+h1{margin:6px 0 0;font-family:var(--font-display);font-weight:700;font-size:31px;letter-spacing:.2px;background:linear-gradient(100deg,var(--ink) 45%,var(--ember-soft) 130%);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 4px;color:var(--ink);display:flex;align-items:center;gap:8px}
+h2::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 3px rgba(255,106,46,.18);flex:0 0 auto}
 .panel-sub{color:var(--muted);font-size:12px;margin:0 0 16px}
 
 .primary,.ghost,.danger{border:0;border-radius:10px;padding:11px 18px;font:700 13px var(--font-body);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,opacity .15s ease}
@@ -81,14 +82,26 @@ h2{font-family:var(--font-display);font-size:16px;font-weight:600;margin:0 0 4px
 /* ---------- Cards ---------- */
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
 .cards>div,.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
-.cards>div{padding:18px;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.cards>div{padding:18px;position:relative;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.cards>div::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-accent,var(--ember));opacity:.85}
 .cards>div:hover{transform:translateY(-3px);border-color:rgba(255,106,46,.35);box-shadow:0 16px 34px -14px rgba(255,106,46,.25)}
+.cards.global>div:nth-child(1){--card-accent:var(--gold)}
+.cards.global>div:nth-child(2){--card-accent:var(--ember)}
+.cards.global>div:nth-child(3){--card-accent:var(--green)}
+.cards.global>div:nth-child(4){--card-accent:var(--green)}
+.cards.global>div:nth-child(5){--card-accent:var(--red)}
+.cards.global>div:nth-child(6){--card-accent:var(--red)}
 .cards span,.stats span,.report span{color:var(--muted);font-size:11.5px;font-weight:600;letter-spacing:.2px;text-transform:uppercase}
 .cards b{display:block;font-family:var(--font-mono);font-weight:700;font-size:26px;margin-top:9px;letter-spacing:.2px;font-variant-numeric:tabular-nums}
 .cards small{display:block;color:var(--muted-2);margin-top:6px;font-size:11.5px}
+.breakdown{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:5px}
+.bd-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted-2)}
+.bd-row span:first-child{color:var(--ink,#F2EFE8);font-weight:600}
+.bd-empty{justify-content:center;font-style:italic;opacity:.7}
 .global{grid-template-columns:repeat(3,1fr)}
 .mini{grid-template-columns:repeat(3,1fr)}
-.panel{padding:20px;margin-bottom:16px}
+.panel{padding:20px;margin-bottom:16px;transition:border-color .18s ease}
+.panel:hover{border-color:rgba(255,255,255,.09)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stats span{background:var(--surface-2);padding:14px;border-radius:11px;display:block;border:1px solid var(--border-soft)}
@@ -159,6 +172,12 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .modalbox h2{margin-bottom:14px}
 .modalbox button{display:block;width:100%;padding:13px 14px;margin:7px 0;border:0;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-soft);color:var(--ink);text-align:left;font-weight:700;cursor:pointer;transition:background .15s ease,border-color .15s ease}
 .modalbox button:hover{background:rgba(255,106,46,.12);border-color:rgba(255,106,46,.4)}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface-2);border-radius:8px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:var(--border)}
 
 /* ---------- Responsive ---------- */
 @media(max-width:1050px){.charts-grid{grid-template-columns:1fr}}
