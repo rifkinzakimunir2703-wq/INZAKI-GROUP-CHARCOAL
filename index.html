@@ -9,9 +9,12 @@
 </div>
 </aside>
 <main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick">+ Catat</button></header>
-<section id="dashboard" class="page active"><div class="cards global">
-<div class="has-breakdown"><span>Stok Bahan Baku Saat Ini</span><b id="dRawQty">0 kg</b><small id="dRawValue">Rp0</small><div id="dRawBreakdown" class="breakdown"></div></div>
-<div class="has-breakdown"><span>Stok Barang Jadi Saat Ini</span><b id="dFinishedQty">0 kg</b><small id="dFinishedValue">Rp0</small><div id="dFinishedBreakdown" class="breakdown"></div></div>
+<section id="dashboard" class="page active">
+<div class="panel stock-panel">
+<div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Bahan baku dan barang jadi ditampilkan terpisah per jenis</small></div></div>
+<div id="stockCards" class="stock-cards"></div>
+</div>
+<div class="cards global">
 <div><span>Laba Mingguan</span><b id="dProfitWeek">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Pengeluaran Mingguan</span><b id="dExpenseWeek">Rp0</b></div>
