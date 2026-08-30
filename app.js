@@ -2,9 +2,9 @@
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
 $$('input[type=date]').forEach(x=>x.value=today);
 
-let S={raw:[],batches:[],sales:[],expenses:[]};
+let S={raw:[],batches:[],sales:[],expenses:[],debts:[]};
 let isAdmin=false;
-const ADMIN_PAGES=['raw','batch','sales','expenses'];
+const ADMIN_PAGES=['raw','batch','sales','expenses','debts'];
 
 /* ---- Supabase client ---- */
 const configOk = typeof SUPABASE_URL!=='undefined' && SUPABASE_URL && !SUPABASE_URL.includes('YOUR-PROJECT') && typeof SUPABASE_ANON_KEY!=='undefined' && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
@@ -14,6 +14,8 @@ if(!configOk){$('#configBanner').classList.add('show')}
 /* ---- Helpers (formatting) ---- */
 const rp=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(+n||0),kg=n=>(+n||0).toLocaleString('id-ID',{maximumFractionDigits:2})+' kg',esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])),landed=r=>(+r.price||0)+((+r.transport||0)+(+r.other||0))/(+r.originalQty||+r.qty||1),day=d=>new Date(d+'T00:00:00'),last7=d=>{let s=new Date();s.setHours(0,0,0,0);s.setDate(s.getDate()-6);return day(d)>=s},thisMonth=d=>{let n=new Date(),x=day(d);return x.getFullYear()==n.getFullYear()&&x.getMonth()==n.getMonth()};
 const signed=n=>`<span class="${(+n||0)<0?'neg':'pos'}">${rp(n)}</span>`;
+function debtRemaining(d){return Math.max(0,(+d.amount||0)-(+d.paidAmount||0))}
+function debtStatus(d){let r=debtRemaining(d);if(r<=0)return{label:'Lunas',cls:'badge-ok'};if(d.dueDate&&day(d.dueDate)<new Date(new Date().setHours(0,0,0,0)))return{label:'Jatuh Tempo',cls:'badge-overdue'};return{label:'Belum Lunas',cls:'badge-pending'}}
 function B(id){return S.batches.find(x=>x.id==id)}
 function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
@@ -21,21 +23,23 @@ function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih
 
 /* ---- DB <-> JS field mapping (snake_case <-> camelCase) ---- */
 const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.original_qty,price:+r.price,transport:+r.transport,other:+r.other,supplier:r.supplier});
-const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note});
+const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,productName:b.product_name||b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note});
 const mapSale=x=>({id:x.id,date:x.date,batchId:x.batch_id,customer:x.customer_name||x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status});
 const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
+const mapDebt=x=>({id:x.id,date:x.date,creditor:x.creditor,desc:x.desc,amount:+x.amount,dueDate:x.due_date,paidAmount:+x.paid_amount||0});
 
 /* ---- Load all data from Supabase ---- */
 async function loadAll(){
   if(!sb)return;
-  const [{data:raw,error:e1},{data:batches,error:e2},{data:sales,error:e3},{data:expenses,error:e4}]=await Promise.all([
+  const [{data:raw,error:e1},{data:batches,error:e2},{data:sales,error:e3},{data:expenses,error:e4},{data:debts,error:e5}]=await Promise.all([
     sb.from('raw_materials').select('*').order('id'),
     sb.from('batches').select('*').order('id'),
     sb.from('sales').select('*').order('id'),
-    sb.from('expenses').select('*').order('id')
+    sb.from('expenses').select('*').order('id'),
+    sb.from('debts').select('*').order('id')
   ]);
-  if(e1||e2||e3||e4){console.error(e1||e2||e3||e4);return}
-  S.raw=(raw||[]).map(mapRaw);S.batches=(batches||[]).map(mapBatch);S.sales=(sales||[]).map(mapSale);S.expenses=(expenses||[]).map(mapExpense);
+  if(e1||e2||e3||e4||e5){console.error(e1||e2||e3||e4||e5);return}
+  S.raw=(raw||[]).map(mapRaw);S.batches=(batches||[]).map(mapBatch);S.sales=(sales||[]).map(mapSale);S.expenses=(expenses||[]).map(mapExpense);S.debts=(debts||[]).map(mapDebt);
 }
 
 /* ---- Realtime sync across devices ---- */
@@ -48,6 +52,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'batches'},scheduleRefetch)
     .on('postgres_changes',{event:'*',schema:'public',table:'sales'},scheduleRefetch)
     .on('postgres_changes',{event:'*',schema:'public',table:'expenses'},scheduleRefetch)
+    .on('postgres_changes',{event:'*',schema:'public',table:'debts'},scheduleRefetch)
     .subscribe();
 }
 
@@ -112,22 +117,28 @@ $('#dRawQty').textContent=kg(rawQty);$('#dRawValue').textContent=rp(rawValue);$(
 let rawByName={};S.raw.forEach(r=>{let k=r.name||'(tanpa nama)';if(!rawByName[k])rawByName[k]={qty:0,value:0};rawByName[k].qty+=r.qty;rawByName[k].value+=r.qty*landed(r)});
 $('#dRawBreakdown').innerHTML=Object.keys(rawByName).length?Object.entries(rawByName).map(([name,v])=>`<div class="bd-row"><span>${esc(name)}</span><span>${kg(v.qty)} · ${rp(v.value)}</span></div>`).join(''):'<div class="bd-row bd-empty">Belum ada bahan baku</div>';
 /* Rincian barang jadi per jenis bahan asal batch */
-let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let k=b.rawName||'(tanpa nama)';if(!finByName[k])finByName[k]={qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
+let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let k=b.productName||'(tanpa nama)';if(!finByName[k])finByName[k]={qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
 $('#dFinishedBreakdown').innerHTML=Object.keys(finByName).length?Object.entries(finByName).map(([name,v])=>`<div class="bd-row"><span>${esc(name)}</span><span>${kg(v.qty)} · ${rp(v.value)}</span></div>`).join(''):'<div class="bd-row bd-empty">Belum ada barang jadi</div>';
 $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
+/* Hutang perusahaan */
+let activeDebts=S.debts.filter(d=>debtRemaining(d)>0),outstanding=activeDebts.reduce((a,d)=>a+debtRemaining(d),0),overdue=activeDebts.filter(d=>debtStatus(d).label==='Jatuh Tempo').length;
+$('#dDebtOutstanding').textContent=rp(outstanding);
+$('#dDebtInfo').textContent=`${activeDebts.length} kreditur aktif${overdue?' · '+overdue+' jatuh tempo':''}`;
+$('#dDebtBreakdown').innerHTML=activeDebts.length?activeDebts.map(d=>`<div class="bd-row"><span>${esc(d.creditor)}</span><span>${rp(debtRemaining(d))} · ${debtStatus(d).label}</span></div>`).join(''):'<div class="bd-row bd-empty">Tidak ada hutang aktif</div>';
 $('#dInput').textContent=kg(inp);$('#dOutput').textContent=kg(out);$('#dLoss').textContent=kg(loss);$('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
 $('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td><td><button onclick="deleteRaw('${r.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
 $('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
-$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
-$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
-let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(6);
+$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${esc(b.productName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(10);
+$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — ${esc(b.productName)} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
+let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.productName)}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
 $('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
 $('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td><td><button onclick="deleteSale('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
 $('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td><td><button onclick="deleteExpense('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
+$('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td>${d.date}</td><td>${esc(d.creditor)}</td><td>${esc(d.desc||'-')}</td><td>${rp(d.amount)}</td><td>${rp(d.paidAmount)}</td><td>${rp(r)}</td><td>${d.dueDate||'-'}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${r>0?`<button onclick="payDebt('${d.id}')" style="background:#3FCE83;color:#0A0C0B;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">💰 Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`}).join('')||empty(9);
 $('#profitTable').innerHTML=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return `<tr><td>${b.code}</td><td>${kg(b.output)}</td><td>${kg(q)}</td><td>${rp(om)}</td><td>${rp(hc)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td></tr>`}).join('')||empty(7);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
-$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div>`;
-$('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.rawName)}<br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
+$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div><div><span>Hutang belum lunas</span><strong>${rp(S.debts.reduce((a,d)=>a+debtRemaining(d),0))}</strong></div>`;
+$('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.productName)} <small style="opacity:.6">(dari ${esc(b.rawName)})</small><br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
  drawCharts();
 }
 
@@ -205,7 +216,7 @@ async function deleteExpense(id) {
 }
 
 /* ---- Navigation ---- */
-function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
 $('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
 $$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
@@ -231,7 +242,7 @@ $('#batchForm').onsubmit=async e=>{
   if(!r||+x.inputQty>r.qty)return alert('Stok bahan baku tidak mencukupi.');
   if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');
   let material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0)+(+x.other||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;
-  const payload={code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note||null};
+  const payload={code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,product_name:x.productName||r.name,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:+x.other||0,note:x.note||null};
   const {data,error}=await sb.from('batches').insert(payload).select().single();
   if(error)return alert('Gagal simpan batch: '+error.message);
   const newQty=r.qty-+x.inputQty;
@@ -284,6 +295,44 @@ $('#expenseForm').onsubmit=async e=>{
   S.expenses.push(mapExpense(data));render();e.target.reset();e.target.date.value=today;
   alert('Pengeluaran berhasil dicatat.');
 };
+
+/* ---- Debts form ---- */
+$('#debtForm').onsubmit=async e=>{
+  e.preventDefault();if(!requireAdmin())return;
+  let x=Object.fromEntries(new FormData(e.target));
+  if(+x.amount<=0)return alert('Jumlah hutang harus lebih dari 0.');
+  const payload={date:x.date,creditor:x.creditor,desc:x.desc||null,amount:+x.amount,due_date:x.dueDate||null,paid_amount:0};
+  const {data,error}=await sb.from('debts').insert(payload).select().single();
+  if(error)return alert('Gagal simpan hutang: '+error.message);
+  S.debts.push(mapDebt(data));render();e.target.reset();e.target.date.value=today;
+  alert('Hutang berhasil dicatat.');
+};
+async function payDebt(id){
+  if(!requireAdmin())return;
+  const d=S.debts.find(x=>x.id===id);
+  if(!d)return alert('Data tidak ditemukan!');
+  const sisa=debtRemaining(d);
+  const input=prompt(`Bayar hutang ke ${d.creditor}\nSisa: ${rp(sisa)}\n\nMasukkan jumlah pembayaran (Rp):`,sisa);
+  if(input===null)return;
+  const jumlah=+input;
+  if(!jumlah||jumlah<=0)return alert('Jumlah pembayaran tidak valid.');
+  if(jumlah>sisa)return alert('Jumlah pembayaran melebihi sisa hutang.');
+  const newPaid=d.paidAmount+jumlah;
+  const {error}=await sb.from('debts').update({paid_amount:newPaid}).eq('id',id);
+  if(error)return alert('Gagal simpan pembayaran: '+error.message);
+  d.paidAmount=newPaid;render();
+  alert('✅ Pembayaran berhasil dicatat.'+(newPaid>=d.amount?' Hutang lunas!':''));
+}
+async function deleteDebt(id){
+  if(!requireAdmin())return;
+  const d=S.debts.find(x=>x.id===id);
+  if(!d)return alert('Data tidak ditemukan!');
+  if(!confirm(`Hapus hutang?\n\nKreditur: ${d.creditor}\nJumlah: ${rp(d.amount)}\nTerbayar: ${rp(d.paidAmount)}\n\nData akan dihapus permanen!`))return;
+  const {error}=await sb.from('debts').delete().eq('id',id);
+  if(error)return alert('Gagal hapus: '+error.message);
+  S.debts=S.debts.filter(x=>x.id!==id);render();
+  alert('✅ Hutang berhasil dihapus!');
+}
 
 /* ---- Backup / Reset ---- */
 $('#backup').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='inzaki-group-backup.json';a.click()};
