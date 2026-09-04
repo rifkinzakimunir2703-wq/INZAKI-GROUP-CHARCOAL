@@ -82,7 +82,7 @@ async function initAuth(){
 
 /* ---- Charts ---- */
 let financeChart=null,productionChart=null;
-const PALETTE={ember:'#FF6A2E',gold:'#E8B84B',red:'#F4685A',green:'#3FCE83',ink:'#F2EFE8',muted:'#8D958F',grid:'#20241F'};
+const PALETTE={ember:'#FF7A3D',gold:'#F2C14E',red:'#FF5C72',green:'#34E7A6',teal:'#2FD9C4',ink:'#F5F3EF',muted:'#8B93A6',grid:'#20242F'};
 function drawCharts(){
  if(typeof Chart==='undefined')return;
  Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
@@ -99,18 +99,21 @@ function drawCharts(){
  S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
  for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
  const grid={color:PALETTE.grid};
+ const isSmall=window.innerWidth<=520;
+ const legendFont={size:isSmall?10:12};
+ const tickFont={size:isSmall?9.5:11};
  if(financeChart)financeChart.destroy();
  financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[
    {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2,pointBackgroundColor:PALETTE.gold},
-   {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.muted,backgroundColor:PALETTE.muted,pointRadius:0},
+   {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.teal,backgroundColor:PALETTE.teal,pointRadius:0},
    {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,backgroundColor:PALETTE.red,pointRadius:0},
    {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(255,106,46,.12)',fill:true,pointRadius:2,pointBackgroundColor:PALETTE.ember}
- ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{grid,ticks:{callback:v=>rp(v)}}}}});
+ ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{grid,ticks:{font:tickFont,callback:v=>rp(v)}}}}});
  if(productionChart)productionChart.destroy();
  productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels,datasets:[
    {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
    {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}},scales:{x:{grid},y:{beginAtZero:true,grid,ticks:{callback:v=>v+' kg'}}}}});
+ ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}}}}});
 }
 
 /* ---- Render ---- */
@@ -120,10 +123,11 @@ let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.red
 let ws=S.sales.filter(x=>last7(x.date)),ms=S.sales.filter(x=>thisMonth(x.date)),we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
 let wc=ws.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),mc=ms.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0);
 /* Kartu stok terpisah per jenis: tiap bahan baku & tiap produk jadi dapat kartu sendiri */
-let rawByName={};S.raw.forEach(r=>{let k=r.name||'(tanpa nama)';if(!rawByName[k])rawByName[k]={qty:0,value:0};rawByName[k].qty+=r.qty;rawByName[k].value+=r.qty*landed(r)});
-let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let k=b.productName||'(tanpa nama)';if(!finByName[k])finByName[k]={qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
-let stockCardsHtml=Object.entries(rawByName).map(([name,v])=>`<div class="stock-card is-raw"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('')
- +Object.entries(finByName).map(([name,v])=>`<div class="stock-card is-product"><span class="stock-tag">Barang Jadi</span><div class="stock-card-name">${esc(name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('');
+let normName=n=>(n||'').trim().toLowerCase();
+let rawByName={};S.raw.forEach(r=>{let disp=(r.name||'(tanpa nama)').trim(),k=normName(disp)||'(tanpa nama)';if(!rawByName[k])rawByName[k]={name:disp,qty:0,value:0};rawByName[k].qty+=r.qty;rawByName[k].value+=r.qty*landed(r)});
+let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let disp=(b.productName||'(tanpa nama)').trim(),k=normName(disp)||'(tanpa nama)';if(!finByName[k])finByName[k]={name:disp,qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
+let stockCardsHtml=Object.values(rawByName).map(v=>`<div class="stock-card is-raw"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('')
+ +Object.values(finByName).map(v=>`<div class="stock-card is-product"><span class="stock-tag">Barang Jadi</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('');
 $('#stockCards').innerHTML=stockCardsHtml||'<div class="stock-empty">Belum ada data bahan baku maupun barang jadi</div>';
 $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
 /* Hutang perusahaan */
@@ -132,21 +136,40 @@ $('#dDebtOutstanding').textContent=rp(outstanding);
 $('#dDebtInfo').textContent=`${activeDebts.length} kreditur aktif${overdue?' · '+overdue+' jatuh tempo':''}`;
 $('#dDebtBreakdown').innerHTML=activeDebts.length?activeDebts.map(d=>`<div class="bd-row"><span>${esc(d.creditor)}</span><span>${rp(debtRemaining(d))} · ${debtStatus(d).label}</span></div>`).join(''):'<div class="bd-row bd-empty">Tidak ada hutang aktif</div>';
 $('#dInput').textContent=kg(inp);$('#dOutput').textContent=kg(out);$('#dLoss').textContent=kg(loss);$('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
+/* Statistik susut per batch (individual, bukan digabung per lini) */
+$('#batchLossList').innerHTML=S.batches.slice().reverse().slice(0,10).map(b=>{
+  let pct=b.lossPct||0,cls=pct<=10?'good':(pct<=20?'warn':'bad');
+  return `<div class="batch-loss-card ${cls}"><div class="blc-top"><b>${esc(b.code)}</b><span class="blc-pct">${pct.toFixed(1)}%</span></div><div class="blc-name">${esc(b.productName)}<small>dari ${esc(b.rawName)}</small></div><div class="blc-bar"><div class="blc-bar-fill" style="width:${Math.min(100,pct)}%"></div></div><div class="blc-meta"><span>Masuk ${kg(b.input)}</span><span>Jadi ${kg(b.output)}</span><span>Susut ${kg(b.loss)}</span></div></div>`;
+}).join('')||'<div class="stock-empty">Belum ada data batch produksi</div>';
 /* Penyusutan per lini produksi, terpisah per pasangan bahan → produk (mis. Kelapa → Kopra, Tempurung Kelapa → Arang) */
 let lossByLine={};S.batches.forEach(b=>{let k=`${b.rawName||'?'}→${b.productName||'?'}`;if(!lossByLine[k])lossByLine[k]={raw:b.rawName,product:b.productName,input:0,output:0,loss:0};lossByLine[k].input+=b.input;lossByLine[k].output+=b.output;lossByLine[k].loss+=b.loss});
 $('#dLossByLine').innerHTML=Object.values(lossByLine).length?Object.values(lossByLine).map(l=>{let pct=l.input?l.loss/l.input*100:0;return `<div class="loss-line"><div class="loss-line-head"><b>${esc(l.raw)} → ${esc(l.product)}</b><span class="loss-pct">${pct.toFixed(1)}% susut</span></div><div class="loss-line-bars"><div class="loss-bar loss-bar-in" style="width:100%"><span>Masuk ${kg(l.input)}</span></div><div class="loss-bar loss-bar-out" style="width:${l.input?Math.max(4,l.output/l.input*100):0}%"><span>Jadi ${kg(l.output)}</span></div></div><small>Susut ${kg(l.loss)}</small></div>`}).join(''):'<div class="bd-row bd-empty">Belum ada data produksi</div>';
-$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td><td><button onclick="deleteRaw('${r.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
+$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td><td><button onclick="deleteRaw('${r.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
 $('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
-$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${esc(b.productName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(10);
+$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${esc(b.productName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(10);
 $('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — ${esc(b.productName)} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
 let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.productName)}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
 $('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
-$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td><td><button onclick="deleteSale('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
-$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td><td><button onclick="deleteExpense('${x.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
-$('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td>${d.date}</td><td>${esc(d.creditor)}</td><td>${esc(d.desc||'-')}</td><td>${rp(d.amount)}</td><td>${rp(d.paidAmount)}</td><td>${rp(r)}</td><td>${d.dueDate||'-'}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${r>0?`<button onclick="payDebt('${d.id}')" style="background:#3FCE83;color:#0A0C0B;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700;margin-right:4px;">💰 Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" style="background:#dc3545;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">🗑️ Hapus</button></td></tr>`}).join('')||empty(9);
-$('#profitTable').innerHTML=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return `<tr><td>${b.code}</td><td>${kg(b.output)}</td><td>${kg(q)}</td><td>${rp(om)}</td><td>${rp(hc)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td></tr>`}).join('')||empty(7);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td><td><button onclick="deleteSale('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
+$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td><td><button onclick="deleteExpense('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
+$('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td>${d.date}</td><td>${esc(d.creditor)}</td><td>${esc(d.desc||'-')}</td><td>${rp(d.amount)}</td><td>${rp(d.paidAmount)}</td><td>${rp(r)}</td><td>${d.dueDate||'-'}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${r>0?`<button onclick="payDebt('${d.id}')" class="btn-pay">💰 Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(9);
+/* Statistik Produksi Lengkap (akumulasi seluruh waktu, per lini produksi) */
+$('#psBatches').textContent=S.batches.length;
+$('#psInput').textContent=kg(inp);$('#psOutput').textContent=kg(out);$('#psLoss').textContent=kg(loss);
+$('#psLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
+$('#psHpp').textContent=rp(S.batches.reduce((a,b)=>a+b.totalHpp,0));
+let lineStats={};S.batches.forEach(b=>{let k=`${b.rawName||'?'}→${b.productName||'?'}`;if(!lineStats[k])lineStats[k]={raw:b.rawName,product:b.productName,batches:0,input:0,output:0,loss:0,hpp:0};let s=lineStats[k];s.batches++;s.input+=b.input;s.output+=b.output;s.loss+=b.loss;s.hpp+=b.totalHpp});
+$('#prodStatsTable').innerHTML=Object.values(lineStats).map(s=>{let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;return `<tr><td>${esc(s.raw)} → ${esc(s.product)}</td><td>${s.batches}</td><td>${kg(s.input)}</td><td>${kg(s.output)}</td><td>${kg(s.loss)}</td><td>${lp.toFixed(1)}%</td><td>${rp(s.hpp)}</td><td>${rp(avgHpp)}</td></tr>`}).join('')||empty(8);
+/* Untung/Rugi per batch — data lengkap untuk evaluasi perusahaan */
+$('#profitTable').innerHTML=S.batches.slice().reverse().map(b=>{
+  let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc,sisa=b.output-q;
+  let status=q===0?{t:'Belum Terjual',c:'badge-pending'}:l>0?{t:'Untung',c:'badge-ok'}:l<0?{t:'Rugi',c:'badge-overdue'}:{t:'Impas',c:'badge-pending'};
+  return `<tr><td>${esc(b.code)}</td><td>${b.date}</td><td>${esc(b.rawName)} → ${esc(b.productName)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.hppkg)}</td><td>${kg(q)}</td><td>${kg(sisa)}</td><td>${rp(om)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td><td><span class="badge ${status.c}">${status.t}</span></td></tr>`;
+}).join('')||empty(12);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
-$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div><div><span>Hutang belum lunas</span><strong>${rp(S.debts.reduce((a,d)=>a+debtRemaining(d),0))}</strong></div>`;
+let batchProfit=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0);return{q,l:om-q*b.hppkg}});
+let untung=batchProfit.filter(x=>x.q>0&&x.l>0).length,rugi=batchProfit.filter(x=>x.q>0&&x.l<0).length,belum=batchProfit.filter(x=>x.q===0).length;
+$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div><div><span>Batch untung / rugi / belum terjual</span><strong>${untung} / ${rugi} / ${belum}</strong></div><div><span>Hutang belum lunas</span><strong>${rp(S.debts.reduce((a,d)=>a+debtRemaining(d),0))}</strong></div>`;
 $('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.productName)} <small style="opacity:.6">(dari ${esc(b.rawName)})</small><br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
  drawCharts();
 }
