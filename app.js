@@ -31,15 +31,22 @@ const mapDebt=x=>({id:x.id,date:x.date,creditor:x.creditor,desc:x.desc,amount:+x
 /* ---- Load all data from Supabase ---- */
 async function loadAll(){
   if(!sb)return;
-  const [{data:raw,error:e1},{data:batches,error:e2},{data:sales,error:e3},{data:expenses,error:e4},{data:debts,error:e5}]=await Promise.all([
-    sb.from('raw_materials').select('*').order('id'),
-    sb.from('batches').select('*').order('id'),
-    sb.from('sales').select('*').order('id'),
-    sb.from('expenses').select('*').order('id'),
-    sb.from('debts').select('*').order('id')
-  ]);
-  if(e1||e2||e3||e4||e5){console.error(e1||e2||e3||e4||e5);return}
-  S.raw=(raw||[]).map(mapRaw);S.batches=(batches||[]).map(mapBatch);S.sales=(sales||[]).map(mapSale);S.expenses=(expenses||[]).map(mapExpense);S.debts=(debts||[]).map(mapDebt);
+  const tables=[
+    {key:'raw',table:'raw_materials',map:mapRaw},
+    {key:'batches',table:'batches',map:mapBatch},
+    {key:'sales',table:'sales',map:mapSale},
+    {key:'expenses',table:'expenses',map:mapExpense},
+    {key:'debts',table:'debts',map:mapDebt}
+  ];
+  const results=await Promise.all(tables.map(t=>sb.from(t.table).select('*').order('id')));
+  results.forEach((res,i)=>{
+    const t=tables[i];
+    if(res.error){
+      console.error(`Gagal memuat tabel "${t.table}":`,res.error.message);
+      return; // tabel ini gagal, tapi tabel lain tetap dimuat & ditampilkan
+    }
+    S[t.key]=(res.data||[]).map(t.map);
+  });
 }
 
 /* ---- Realtime sync across devices ---- */
