@@ -20,6 +20,8 @@ function B(id){return S.batches.find(x=>x.id==id)}
 function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
 function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih dahulu.');return false}return true}
+/* Mengisi beberapa elemen sekaligus dengan konten yang sama (dipakai supaya panel Laba & Laporan tampil identik di Dashboard dan halaman Laporan) */
+function setAll(ids,value,isText){ids.forEach(id=>{let el=document.getElementById(id);if(el){if(isText)el.textContent=value;else el.innerHTML=value}})}
 
 /* ---- DB <-> JS field mapping (snake_case <-> camelCase) ---- */
 const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.original_qty,price:+r.price,transport:+r.transport,other:+r.other,supplier:r.supplier});
@@ -72,6 +74,7 @@ function applyAuthState(session){
   $('#loginBtn').style.display=isAdmin?'none':'block';
   $('#logoutBtn').style.display=isAdmin?'block':'none';
   $('#authStatus').textContent=isAdmin?('🟢 Admin — '+session.user.email):'🔒 Mode Publik — lihat saja';
+  render();
 }
 async function initAuth(){
   if(!sb)return;
@@ -82,7 +85,7 @@ async function initAuth(){
 
 /* ---- Charts ---- */
 let financeChart=null,productionChart=null;
-const PALETTE={ember:'#FF7A3D',gold:'#F2C14E',red:'#FF5C72',green:'#34E7A6',teal:'#2FD9C4',ink:'#F5F3EF',muted:'#8B93A6',grid:'#20242F'};
+const PALETTE={ember:'#1DB454',gold:'#F5A524',red:'#EF4763',green:'#1DB454',teal:'#0EA5A8',ink:'#161A13',muted:'#6E7768',grid:'#E2E7DA'};
 function drawCharts(){
  if(typeof Chart==='undefined')return;
  Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
@@ -135,43 +138,65 @@ let activeDebts=S.debts.filter(d=>debtRemaining(d)>0),outstanding=activeDebts.re
 $('#dDebtOutstanding').textContent=rp(outstanding);
 $('#dDebtInfo').textContent=`${activeDebts.length} kreditur aktif${overdue?' · '+overdue+' jatuh tempo':''}`;
 $('#dDebtBreakdown').innerHTML=activeDebts.length?activeDebts.map(d=>`<div class="bd-row"><span>${esc(d.creditor)}</span><span>${rp(debtRemaining(d))} · ${debtStatus(d).label}</span></div>`).join(''):'<div class="bd-row bd-empty">Tidak ada hutang aktif</div>';
-$('#dInput').textContent=kg(inp);$('#dOutput').textContent=kg(out);$('#dLoss').textContent=kg(loss);$('#dLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
-/* Statistik susut per batch (individual, bukan digabung per lini) */
+/* ---- Untung/rugi per batch (dihitung lebih awal supaya bisa dipakai di kartu Statistik Susut) ---- */
+function batchProfitInfo(b){let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc;return{om,q,hc,l,sisa:b.output-q}}
+let allBatchProfit=S.batches.map(batchProfitInfo);
+let totalRealizedProfit=allBatchProfit.reduce((a,x)=>a+x.l,0);
+$('#susutTotal').innerHTML=`<span>Total ${totalRealizedProfit<0?'Kerugian':'Keuntungan'} Terjual: </span>${signed(totalRealizedProfit)}`;
+$('#susutTotal').className='susut-total '+(totalRealizedProfit<0?'neg':'pos');
+/* Statistik susut per batch (individual, bukan digabung per lini), + untung/rugi Rp */
 $('#batchLossList').innerHTML=S.batches.slice().reverse().slice(0,10).map(b=>{
-  let pct=b.lossPct||0,cls=pct<=10?'good':(pct<=20?'warn':'bad');
-  return `<div class="batch-loss-card ${cls}"><div class="blc-top"><b>${esc(b.code)}</b><span class="blc-pct">${pct.toFixed(1)}%</span></div><div class="blc-name">${esc(b.productName)}<small>dari ${esc(b.rawName)}</small></div><div class="blc-bar"><div class="blc-bar-fill" style="width:${Math.min(100,pct)}%"></div></div><div class="blc-meta"><span>Masuk ${kg(b.input)}</span><span>Jadi ${kg(b.output)}</span><span>Susut ${kg(b.loss)}</span></div></div>`;
+  let pct=b.lossPct||0,cls=pct<=10?'good':(pct<=20?'warn':'bad'),pf=batchProfitInfo(b);
+  let profitRow=pf.q>0?`<div class="blc-profit ${pf.l<0?'neg':'pos'}"><span>${pf.l<0?'Rugi':'Untung'}</span><b>${rp(Math.abs(pf.l))}</b></div>`:`<div class="blc-profit"><span>Belum terjual</span><b>—</b></div>`;
+  return `<div class="batch-loss-card ${cls}"><div class="blc-top"><b>${esc(b.code)}</b><span class="blc-pct">${pct.toFixed(1)}%</span></div><div class="blc-name">${esc(b.productName)}<small>dari ${esc(b.rawName)}</small></div><div class="blc-bar"><div class="blc-bar-fill" style="width:${Math.min(100,pct)}%"></div></div><div class="blc-meta"><span>Masuk ${kg(b.input)}</span><span>Jadi ${kg(b.output)}</span><span>Susut ${kg(b.loss)}</span></div>${profitRow}</div>`;
 }).join('')||'<div class="stock-empty">Belum ada data batch produksi</div>';
-/* Penyusutan per lini produksi, terpisah per pasangan bahan → produk (mis. Kelapa → Kopra, Tempurung Kelapa → Arang) */
-let lossByLine={};S.batches.forEach(b=>{let k=`${b.rawName||'?'}→${b.productName||'?'}`;if(!lossByLine[k])lossByLine[k]={raw:b.rawName,product:b.productName,input:0,output:0,loss:0};lossByLine[k].input+=b.input;lossByLine[k].output+=b.output;lossByLine[k].loss+=b.loss});
-$('#dLossByLine').innerHTML=Object.values(lossByLine).length?Object.values(lossByLine).map(l=>{let pct=l.input?l.loss/l.input*100:0;return `<div class="loss-line"><div class="loss-line-head"><b>${esc(l.raw)} → ${esc(l.product)}</b><span class="loss-pct">${pct.toFixed(1)}% susut</span></div><div class="loss-line-bars"><div class="loss-bar loss-bar-in" style="width:100%"><span>Masuk ${kg(l.input)}</span></div><div class="loss-bar loss-bar-out" style="width:${l.input?Math.max(4,l.output/l.input*100):0}%"><span>Jadi ${kg(l.output)}</span></div></div><small>Susut ${kg(l.loss)}</small></div>`}).join(''):'<div class="bd-row bd-empty">Belum ada data produksi</div>';
-$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td>${esc(r.name)}</td><td>${kg(r.qty)}</td><td>${rp(r.price)}</td><td>${rp(r.transport)}</td><td>${rp(r.other)}</td><td>${rp(landed(r))}</td><td>${rp(r.qty*landed(r))}</td><td>${esc(r.supplier||'-')}</td><td><button onclick="deleteRaw('${r.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
-$('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
-$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td>${b.code}</td><td>${b.date}</td><td>${esc(b.rawName)}</td><td>${esc(b.productName)}</td><td>${kg(b.input)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.totalHpp)}</td><td>${rp(b.hppkg)}</td><td><button onclick="deleteBatch('${b.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(10);
-$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — ${esc(b.productName)} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
-let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td>${b.code}</td><td>${esc(b.productName)}</td><td>${esc(b.rawName)}</td><td>${kg(b.output)}</td><td>${kg(sold(b.id))}</td><td>${kg(q)}</td><td>${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
-$('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
-$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td>${x.date}</td><td>${b?.code||'-'}</td><td>${esc(x.customer||'')}</td><td>${kg(x.qty)}</td><td>${rp(x.total)}</td><td>${rp(c)}</td><td>${signed(x.total-c)}</td><td><button onclick="deleteSale('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
-$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td>${x.date}</td><td>${x.cat}</td><td>${esc(x.desc)}</td><td>${rp(x.amount)}</td><td><button onclick="deleteExpense('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
-$('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td>${d.date}</td><td>${esc(d.creditor)}</td><td>${esc(d.desc||'-')}</td><td>${rp(d.amount)}</td><td>${rp(d.paidAmount)}</td><td>${rp(r)}</td><td>${d.dueDate||'-'}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${r>0?`<button onclick="payDebt('${d.id}')" class="btn-pay">💰 Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(9);
-/* Statistik Produksi Lengkap (akumulasi seluruh waktu, per lini produksi) */
-$('#psBatches').textContent=S.batches.length;
-$('#psInput').textContent=kg(inp);$('#psOutput').textContent=kg(out);$('#psLoss').textContent=kg(loss);
-$('#psLossPct').textContent=(inp?loss/inp*100:0).toFixed(1)+'%';
-$('#psHpp').textContent=rp(S.batches.reduce((a,b)=>a+b.totalHpp,0));
+/* Statistik per lini produksi (mis. Kelapa → Kopra, Batok Kelapa → Arang), dipakai di dashboard & laporan */
 let lineStats={};S.batches.forEach(b=>{let k=`${b.rawName||'?'}→${b.productName||'?'}`;if(!lineStats[k])lineStats[k]={raw:b.rawName,product:b.productName,batches:0,input:0,output:0,loss:0,hpp:0};let s=lineStats[k];s.batches++;s.input+=b.input;s.output+=b.output;s.loss+=b.loss;s.hpp+=b.totalHpp});
-$('#prodStatsTable').innerHTML=Object.values(lineStats).map(s=>{let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;return `<tr><td>${esc(s.raw)} → ${esc(s.product)}</td><td>${s.batches}</td><td>${kg(s.input)}</td><td>${kg(s.output)}</td><td>${kg(s.loss)}</td><td>${lp.toFixed(1)}%</td><td>${rp(s.hpp)}</td><td>${rp(avgHpp)}</td></tr>`}).join('')||empty(8);
-/* Untung/Rugi per batch — data lengkap untuk evaluasi perusahaan */
-$('#profitTable').innerHTML=S.batches.slice().reverse().map(b=>{
+$('#lineStatsCards').innerHTML=Object.values(lineStats).length?Object.values(lineStats).map((s,i)=>{
+  let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;
+  let lineBatches=S.batches.filter(b=>b.rawName===s.raw&&b.productName===s.product);
+  let sisaStok=lineBatches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id)),0),nilaiStok=lineBatches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
+  return `<div class="line-card"><div class="line-card-head"><b>${esc(s.raw)} → ${esc(s.product)}</b><span>${s.batches} batch</span></div><div class="line-stats-mini">
+  <div><span>Bahan Masuk</span><b>${kg(s.input)}</b></div>
+  <div><span>Hasil Produksi</span><b>${kg(s.output)}</b></div>
+  <div><span>Susut</span><b>${kg(s.loss)} (${lp.toFixed(1)}%)</b></div>
+  <div><span>HPP / kg</span><b>${rp(avgHpp)}</b></div>
+  <div><span>Stok Tersisa</span><b>${kg(sisaStok)}</b></div>
+  <div><span>Nilai Stok</span><b>${rp(nilaiStok)}</b></div>
+  </div></div>`;
+}).join(''):'<div class="stock-empty">Belum ada data produksi</div>';
+$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td data-label="Bahan">${esc(r.name)}</td><td data-label="Stok">${kg(r.qty)}</td><td data-label="Harga/kg">${rp(r.price)}</td><td data-label="Transport">${rp(r.transport)}</td><td data-label="Biaya lain">${rp(r.other)}</td><td data-label="HPP masuk/kg">${rp(landed(r))}</td><td data-label="Nilai stok">${rp(r.qty*landed(r))}</td><td data-label="Supplier">${esc(r.supplier||'-')}</td><td data-label="Aksi"><button onclick="deleteRaw('${r.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(9);
+$('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
+$('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td data-label="Batch">${b.code}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan Baku">${esc(b.rawName)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Input">${kg(b.input)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Penyusutan">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="HPP Batch">${rp(b.totalHpp)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Aksi"><button onclick="deleteBatch('${b.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(10);
+$('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<option value="${b.id}">${b.code} — ${esc(b.productName)} — sisa ${kg(b.output-sold(b.id))} — HPP ${rp(b.hppkg)}/kg</option>`).join('');
+let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td data-label="Batch">${b.code}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(sold(b.id))}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
+$('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td data-label="Tanggal">${x.date}</td><td data-label="Batch">${b?.code||'-'}</td><td data-label="Pelanggan">${esc(x.customer||'')}</td><td data-label="Qty">${kg(x.qty)}</td><td data-label="Omzet">${rp(x.total)}</td><td data-label="HPP">${rp(c)}</td><td data-label="Laba">${signed(x.total-c)}</td><td data-label="Aksi"><button onclick="deleteSale('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(8);
+$('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td data-label="Tanggal">${x.date}</td><td data-label="Kategori">${x.cat}</td><td data-label="Deskripsi">${esc(x.desc)}</td><td data-label="Jumlah">${rp(x.amount)}</td><td data-label="Aksi"><button onclick="deleteExpense('${x.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`).join('')||empty(5);
+$('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td data-label="Tanggal">${d.date}</td><td data-label="Kreditur">${esc(d.creditor)}</td><td data-label="Keterangan">${esc(d.desc||'-')}</td><td data-label="Jumlah">${rp(d.amount)}</td><td data-label="Terbayar">${rp(d.paidAmount)}</td><td data-label="Sisa">${rp(r)}</td><td data-label="Jatuh Tempo">${d.dueDate||'-'}</td><td data-label="Status"><span class="badge ${st.cls}">${st.label}</span></td><td data-label="Aksi">${r>0?`<button onclick="payDebt('${d.id}')" class="btn-pay">💰 Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" class="btn-delete">🗑️ Hapus</button></td></tr>`}).join('')||empty(9);
+/* Statistik Produksi Lengkap (akumulasi seluruh waktu, per lini produksi) — tampil di halaman Laporan & juga di Dashboard */
+setAll(['psBatches','psBatchesD'],S.batches.length,true);
+setAll(['psInput','psInputD'],kg(inp),true);setAll(['psOutput','psOutputD'],kg(out),true);setAll(['psLoss','psLossD'],kg(loss),true);
+setAll(['psLossPct','psLossPctD'],(inp?loss/inp*100:0).toFixed(1)+'%',true);
+setAll(['psHpp','psHppD'],rp(S.batches.reduce((a,b)=>a+b.totalHpp,0)),true);
+let prodStatsHtml=Object.values(lineStats).map(s=>{let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;return `<tr><td data-label="Lini Produksi">${esc(s.raw)} → ${esc(s.product)}</td><td data-label="Jumlah Batch">${s.batches}</td><td data-label="Total Masuk">${kg(s.input)}</td><td data-label="Total Jadi">${kg(s.output)}</td><td data-label="Total Susut">${kg(s.loss)}</td><td data-label="Rata² Susut">${lp.toFixed(1)}%</td><td data-label="Total HPP">${rp(s.hpp)}</td><td data-label="Rata² HPP/kg">${rp(avgHpp)}</td></tr>`}).join('')||empty(8);
+setAll(['prodStatsTable','prodStatsTableD'],prodStatsHtml,false);
+/* Untung/Rugi per batch — data lengkap untuk evaluasi perusahaan — tampil di halaman Laporan & juga di Dashboard */
+let profitHtml=S.batches.slice().reverse().map(b=>{
   let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc,sisa=b.output-q;
   let status=q===0?{t:'Belum Terjual',c:'badge-pending'}:l>0?{t:'Untung',c:'badge-ok'}:l<0?{t:'Rugi',c:'badge-overdue'}:{t:'Impas',c:'badge-pending'};
-  return `<tr><td>${esc(b.code)}</td><td>${b.date}</td><td>${esc(b.rawName)} → ${esc(b.productName)}</td><td>${kg(b.output)}</td><td>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td>${rp(b.hppkg)}</td><td>${kg(q)}</td><td>${kg(sisa)}</td><td>${rp(om)}</td><td>${signed(l)}</td><td>${om?(l/om*100).toFixed(1):0}%</td><td><span class="badge ${status.c}">${status.t}</span></td></tr>`;
+  return `<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan → Produk">${esc(b.rawName)} → ${esc(b.productName)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Susut">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Terjual">${kg(q)}</td><td data-label="Sisa Stok">${kg(sisa)}</td><td data-label="Omzet">${rp(om)}</td><td data-label="Untung/Rugi">${signed(l)}</td><td data-label="Margin">${om?(l/om*100).toFixed(1):0}%</td><td data-label="Status"><span class="badge ${status.c}">${status.t}</span></td></tr>`;
 }).join('')||empty(12);
+setAll(['profitTable','profitTableD'],profitHtml,false);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
 let batchProfit=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0);return{q,l:om-q*b.hppkg}});
 let untung=batchProfit.filter(x=>x.q>0&&x.l>0).length,rugi=batchProfit.filter(x=>x.q>0&&x.l<0).length,belum=batchProfit.filter(x=>x.q===0).length;
-$('#report').innerHTML=`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div><div><span>Batch untung / rugi / belum terjual</span><strong>${untung} / ${rugi} / ${belum}</strong></div><div><span>Hutang belum lunas</span><strong>${rp(S.debts.reduce((a,d)=>a+debtRemaining(d),0))}</strong></div>`;
+setAll(['report','reportD'],`<div><span>Total omzet</span><strong>${rp(totalSales)}</strong></div><div><span>HPP terjual</span><strong>${rp(totalCogs)}</strong></div><div><span>Laba kotor</span><strong>${signed(totalSales-totalCogs)}</strong></div><div><span>Pengeluaran umum</span><strong>${rp(totalExp)}</strong></div><div><span>Laba bersih</span><strong>${signed(totalSales-totalCogs-totalExp)}</strong></div><div><span>Total batch</span><strong>${S.batches.length}</strong></div><div><span>Batch untung / rugi / belum terjual</span><strong>${untung} / ${rugi} / ${belum}</strong></div><div><span>Hutang belum lunas</span><strong>${rp(S.debts.reduce((a,d)=>a+debtRemaining(d),0))}</strong></div>`,false);
 $('#recent').innerHTML=S.batches.slice(-5).reverse().map(b=>`<div style="padding:10px;border-bottom:1px solid #eee"><b>${b.code}</b> · ${esc(b.productName)} <small style="opacity:.6">(dari ${esc(b.rawName)})</small><br><small>${b.date} · ${kg(b.output)} · HPP ${rp(b.hppkg)}/kg · susut ${b.lossPct.toFixed(1)}%</small></div>`).join('')||'Belum ada batch.';
- drawCharts();
+/* ---- Gate: sembunyikan detail keuangan dari publik, tampil hanya setelah login admin ---- */
+let financeLocked=$('#financeLocked'),financeContent=$('#financeContent');
+if(financeLocked&&financeContent){financeLocked.style.display=isAdmin?'none':'block';financeContent.style.display=isAdmin?'block':'none'}
+drawCharts();
 }
 
 /* ---- DELETE FUNCTIONS ---- */
@@ -266,6 +291,18 @@ $('#rawForm').onsubmit=async e=>{
   S.raw.push(mapRaw(data));render();e.target.reset();e.target.date.value=today;rawPreview();
   alert('Bahan baku berhasil dicatat.');
 };
+
+/* ---- Auto-isi nama produk sesuai bahan baku (Kelapa→Kopra, Batok Kelapa→Arang), supaya nama lini produksi konsisten untuk statistik ---- */
+function suggestProductName(rawName){
+  let n=(rawName||'').toLowerCase();
+  if(n.includes('batok')||n.includes('tempurung'))return 'Arang';
+  if(n.includes('kelapa'))return 'Kopra';
+  return '';
+}
+document.getElementById('rawSelect').addEventListener('change',()=>{
+  let r=S.raw.find(z=>z.id==document.getElementById('rawSelect').value),f=document.querySelector('#batchForm [name="productName"]');
+  if(r&&f&&!f.value.trim())f.value=suggestProductName(r.name);
+});
 
 /* ---- Batch production form ---- */
 $('#batchForm').onsubmit=async e=>{
@@ -382,6 +419,7 @@ document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')dr
 
 /* ---- Login / Logout ---- */
 $('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
+$('#financeLoginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
 $('#loginCancel').onclick=()=>$('#loginModal').classList.remove('show');
 $('#loginForm').onsubmit=async e=>{
   e.preventDefault();

@@ -1,4 +1,4 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><meta name="theme-color" content="#0A0C0B"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><meta name="theme-color" content="#F3F5EF"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
 <div id="configBanner" class="config-banner"><div class="config-box"><h2>⚠ Supabase belum dikonfigurasi</h2><p>Buka file <code>config.js</code>, isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan data project Supabase kamu, lalu jalankan <code>supabase-schema.sql</code> di SQL Editor. Panduan lengkap ada di <code>README.md</code>.</p></div></div>
 <div class="layout"><aside><div class="brand"><div class="logo"><span>IG</span></div><div class="brand-text"><b>INZAKI<i>GROUP</i></b><small>Business Dashboard</small></div></div><nav>
 <button class="active" data-page="dashboard"><span class="nav-ic">⌂</span><span class="nav-lb">Dashboard</span></button><button class="admin-only" data-page="raw"><span class="nav-ic">▣</span><span class="nav-lb">Bahan Baku</span></button><button class="admin-only" data-page="batch"><span class="nav-ic">♨</span><span class="nav-lb">Produksi Batch</span></button><button data-page="finished"><span class="nav-ic">◈</span><span class="nav-lb">Barang Jadi</span></button><button class="admin-only" data-page="sales"><span class="nav-ic">▤</span><span class="nav-lb">Penjualan</span></button><button class="admin-only" data-page="expenses"><span class="nav-ic">↗</span><span class="nav-lb">Pengeluaran</span></button><button class="admin-only" data-page="debts"><span class="nav-ic">⛁</span><span class="nav-lb">Hutang</span></button><button data-page="reports"><span class="nav-ic">◫</span><span class="nav-lb">Laba & Laporan</span></button></nav>
@@ -10,34 +10,89 @@
 </aside>
 <main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick">+ Catat</button></header>
 <section id="dashboard" class="page active">
+
+<div class="section-block">
+<div class="section-label">Bahan Baku &amp; Barang Jadi</div>
 <div class="panel stock-panel">
 <div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Bahan baku dan barang jadi ditampilkan terpisah per jenis</small></div></div>
 <div id="stockCards" class="stock-cards"></div>
 </div>
+</div>
+
+<div class="section-block">
+<div class="section-label">Statistik Produksi per Lini</div>
+<div id="lineStatsCards" class="line-stats-grid"></div>
+</div>
+
+<div class="panel batch-loss-panel">
+<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
+<div id="batchLossList" class="batch-loss-list"></div>
+</div>
+
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
+<canvas id="productionChart"></canvas>
+</div>
+
+<div class="panel"><h2>Batch Terbaru</h2><div id="recent"></div></div>
+
+<div class="section-divider"><span>Keuangan</span></div>
+
+<details class="finance-toggle" id="financeSection">
+<summary><div><h2>💰 Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
+<div class="finance-body">
+
+<div id="financeLocked" class="finance-locked">
+<span class="lock-ic">🔒</span>
+<p>Data keuangan bersifat rahasia dan hanya bisa dilihat setelah login sebagai admin.</p>
+<button class="ghost small" id="financeLoginBtn">Login Admin</button>
+</div>
+
+<div id="financeContent">
+
 <div class="cards global">
 <div><span>Laba Mingguan</span><b id="dProfitWeek">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Pengeluaran Mingguan</span><b id="dExpenseWeek">Rp0</b></div>
 <div><span>Pengeluaran Bulanan</span><b id="dExpenseMonth">Rp0</b></div>
 <div class="span-full"><span>Hutang Perusahaan (Sisa Belum Lunas)</span><b id="dDebtOutstanding">Rp0</b><small id="dDebtInfo">0 kreditur aktif</small><div id="dDebtBreakdown" class="breakdown"></div></div></div>
-<div class="panel batch-loss-panel">
-<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan tiap batch produksi, terbaru lebih dulu</small></div></div>
-<div id="batchLossList" class="batch-loss-list"></div>
-</div>
-<div class="charts-grid">
+
 <div class="panel chart-panel">
 <div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div>
 <canvas id="financeChart"></canvas>
 </div>
-<div class="panel chart-panel">
-<div class="panel-head"><div><h2>Produksi</h2><small>Bahan baku masuk vs barang jadi</small></div></div>
-<canvas id="productionChart"></canvas>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div>
+<div class="stats prod-overview">
+<span>Total Batch<b id="psBatchesD">0</b></span>
+<span>Total Bahan Masuk<b id="psInputD">0 kg</b></span>
+<span>Total Barang Jadi<b id="psOutputD">0 kg</b></span>
+<span>Total Susut<b id="psLossD">0 kg</b></span>
+<span>Rata-rata Susut<b id="psLossPctD">0%</b></span>
+<span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
+</div>
+<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div>
+<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
+<div class="report" id="reportD"></div>
+</div>
+
 </div>
 </div>
-<div class="grid"><div class="panel"><h2>Produksi</h2><div class="stats"><span>Total bahan masuk<b id="dInput">0 kg</b></span><span>Total barang jadi<b id="dOutput">0 kg</b></span><span>Total penyusutan<b id="dLoss">0 kg</b></span><span>Rata-rata penyusutan<b id="dLossPct">0%</b></span></div><div id="dLossByLine" class="loss-lines"></div></div><div class="panel"><h2>Batch Terbaru</h2><div id="recent"></div></div></div></section>
+</details>
+
+</section>
 
 <section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form">
-<label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Tempurung kelapa" required></label>
+<label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label>
 <label>Qty (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga bahan/kg (Rp)<input type=number name=price min=0 required></label>
 <label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label>
 <label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div>
