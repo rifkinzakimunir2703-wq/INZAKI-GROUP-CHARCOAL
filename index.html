@@ -1,14 +1,16 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><meta name="theme-color" content="#F3F5EF"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
-<div id="configBanner" class="config-banner"><div class="config-box"><h2>⚠ Supabase belum dikonfigurasi</h2><p>Buka file <code>config.js</code>, isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan data project Supabase kamu, lalu jalankan <code>supabase-schema.sql</code> di SQL Editor. Panduan lengkap ada di <code>README.md</code>.</p></div></div>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%2316A34A'/%3E%3Ctext x='20' y='27' font-family='Arial,sans-serif' font-weight='700' font-size='16' fill='%2304170B' text-anchor='middle'%3EIG%3C/text%3E%3C/svg%3E"><meta name="theme-color" content="#0A0D0B"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
+<div id="loadingOverlay" class="loading-overlay"><div class="loading-box"><div class="loading-logo"><span>IG</span></div><div class="loading-spinner"></div><p>Memuat data dashboard…</p></div></div>
+<div id="configBanner" class="config-banner"><div class="config-box"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Supabase belum dikonfigurasi</h2><p>Buka file <code>config.js</code>, isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan data project Supabase kamu, lalu jalankan <code>supabase-schema.sql</code> di SQL Editor. Panduan lengkap ada di <code>README.md</code>.</p></div></div>
 <div class="layout"><aside><div class="brand"><div class="logo"><span>IG</span></div><div class="brand-text"><b>INZAKI<i>GROUP</i></b><small>Business Dashboard</small></div></div><nav>
-<button class="active" data-page="dashboard"><span class="nav-ic">⌂</span><span class="nav-lb">Dashboard</span></button><button class="admin-only" data-page="raw"><span class="nav-ic">▣</span><span class="nav-lb">Bahan Baku</span></button><button class="admin-only" data-page="batch"><span class="nav-ic">♨</span><span class="nav-lb">Produksi Batch</span></button><button data-page="finished"><span class="nav-ic">◈</span><span class="nav-lb">Barang Jadi</span></button><button class="admin-only" data-page="sales"><span class="nav-ic">▤</span><span class="nav-lb">Penjualan</span></button><button class="admin-only" data-page="expenses"><span class="nav-ic">↗</span><span class="nav-lb">Pengeluaran</span></button><button class="admin-only" data-page="debts"><span class="nav-ic">⛁</span><span class="nav-lb">Hutang</span></button><button data-page="reports"><span class="nav-ic">◫</span><span class="nav-lb">Laba & Laporan</span></button></nav>
+<button class="active" data-page="dashboard"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9"/></svg></span><span class="nav-lb">Dashboard</span></button><button class="admin-only" data-page="raw"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span><span class="nav-lb">Bahan Baku</span></button><button class="admin-only" data-page="batch"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6"/><path d="M10 2v6.34a2 2 0 01-.4 1.2L4.53 17.4A2 2 0 006.13 21h11.74a2 2 0 001.6-3.6l-5.07-7.86A2 2 0 0114 8.34V2"/><path d="M6.5 14.5h11"/></svg></span><span class="nav-lb">Produksi Batch</span></button><button data-page="finished"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span><span class="nav-lb">Barang Jadi</span></button><button class="admin-only" data-page="sales"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg></span><span class="nav-lb">Penjualan</span></button><button class="admin-only" data-page="expenses"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg></span><span class="nav-lb">Pengeluaran</span></button><button class="admin-only" data-page="debts"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M19 21V10"/><path d="M2 10l10-6 10 6"/></svg></span><span class="nav-lb">Hutang</span></button><button data-page="reports"><span class="nav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3"/><path d="M12 10v8"/><path d="M17 6v12"/></svg></span><span class="nav-lb">Laba & Laporan</span></button></nav>
 <div class="foot">
-<div id="authStatus" class="auth-status">🔒 Mode Publik — lihat saja</div>
+<div id="syncBadge" class="sync-badge"><span class="sync-dot"></span><span id="syncText">Menghubungkan…</span></div>
+<div id="authStatus" class="auth-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></svg> Mode Publik — lihat saja</div>
 <button class="ghost small" id="loginBtn">Login Admin</button>
 <button class="ghost small" id="logoutBtn" style="display:none">Logout</button>
 </div>
 </aside>
-<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick">+ Catat</button></header>
+<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
 <section id="dashboard" class="page active">
 
 <div class="section-block">
@@ -34,16 +36,16 @@
 <canvas id="productionChart"></canvas>
 </div>
 
-<div class="panel"><h2>Batch Terbaru</h2><div id="recent"></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Batch Terbaru</h2><small id="recentSub">5 batch produksi paling akhir</small></div></div><div id="recent"></div></div>
 
 <div class="section-divider"><span>Keuangan</span></div>
 
 <details class="finance-toggle" id="financeSection">
-<summary><div><h2>💰 Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
+<summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
 <div class="finance-body">
 
 <div id="financeLocked" class="finance-locked">
-<span class="lock-ic">🔒</span>
+<span class="lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></svg></span>
 <p>Data keuangan bersifat rahasia dan hanya bisa dilihat setelah login sebagai admin.</p>
 <button class="ghost small" id="financeLoginBtn">Login Admin</button>
 </div>
@@ -71,6 +73,7 @@
 <span>Total Susut<b id="psLossD">0 kg</b></span>
 <span>Rata-rata Susut<b id="psLossPctD">0%</b></span>
 <span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
+<span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
 </div>
 <table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
 </div>
@@ -128,6 +131,7 @@
 <span>Total Susut<b id="psLoss">0 kg</b></span>
 <span>Rata-rata Susut<b id="psLossPct">0%</b></span>
 <span>Total HPP Produksi<b id="psHpp">Rp0</b></span>
+<span>Total Hari Produksi<b id="psDays">0 hari</b></span>
 </div>
 <table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table>
 </div>
@@ -140,7 +144,7 @@
 <div class="panel">
 <div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
 <div class="report" id="report"></div>
-<button class="ghost" id="backup">Backup JSON</button> <button class="danger admin-only" id="reset">Hapus Semua Data</button>
+<button class="ghost" id="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup JSON</button> <button class="danger admin-only" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Hapus Semua Data</button>
 </div>
 
 </section>
