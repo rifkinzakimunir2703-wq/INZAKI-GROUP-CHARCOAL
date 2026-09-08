@@ -13,6 +13,41 @@
 <main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
 <section id="dashboard" class="page active">
 
+<!-- V10.2 COMMAND CENTER: fungsi inti terlihat langsung di dashboard -->
+<div class="command-center">
+  <div class="command-head"><div><span class="eyebrow">COMMAND CENTER</span><h2>Semua kontrol utama dalam satu layar</h2><p>Input cepat, posisi kas, piutang, stok, produksi dan peringatan tanpa harus pindah halaman.</p></div><div class="command-date" id="commandDate"></div></div>
+  <div id="commandKpis" class="command-kpis"></div>
+  <div class="command-grid">
+    <div class="panel command-panel"><div class="panel-head"><div><h2>Catat Cepat</h2><small>Form penting tersedia langsung di dashboard</small></div></div>
+      <div class="quick-forms">
+        <form id="quickSalesForm" class="mini-form"><b>💰 Penjualan</b><input type=date name=date required><input name=customer placeholder="Pelanggan" required><select name=batchId id="quickSalesBatch" required></select><div class="two"><input type=number name=qty min=.01 step=.01 placeholder="Qty kg" required><input type=number name=price min=0 step=100 placeholder="Harga/kg" required></div><select name=status><option>Lunas</option><option>Piutang</option></select><button class="primary">Simpan Penjualan</button></form>
+        <form id="quickRawForm" class="mini-form"><b>📦 Bahan Baku</b><input type=date name=date required><input name=name placeholder="Nama bahan" required><div class="two"><input type=number name=qty min=.01 step=.01 placeholder="Qty kg" required><input type=number name=price min=0 step=100 placeholder="Harga/kg" required></div><input type=number name=transport min=0 step=100 placeholder="Transport"><input name=supplier placeholder="Supplier"><button class="primary">Simpan Bahan</button></form>
+        <form id="quickBatchForm" class="mini-form"><b>🏭 Produksi Batch</b><input type=date name=date required><select name=rawId id="quickBatchRaw" required></select><input name=productName placeholder="Nama produk (mis. Arang)" required><div class="two"><input type=number name=inputQty min=.01 step=.01 placeholder="Bahan masuk kg" required><input type=number name=outputQty min=.01 step=.01 placeholder="Hasil jadi kg" required></div><div class="two"><input type=number name=labor min=0 step=100 placeholder="Tenaga kerja Rp"><input type=number name=energy min=0 step=100 placeholder="Energi Rp"></div><button class="primary">Simpan Produksi</button></form>
+        <form id="quickExpenseForm" class="mini-form"><b>💸 Pengeluaran</b><input type=date name=date required><select name=cat><option>Operasional</option><option>Tenaga Kerja</option><option>Energi</option><option>Transportasi</option><option>Lain-lain</option></select><input name=desc placeholder="Keterangan" required><input type=number name=amount min=0 step=100 placeholder="Jumlah Rp" required><button class="primary">Simpan Pengeluaran</button></form>
+        <form id="quickDebtForm" class="mini-form"><b>🏦 Hutang</b><input type=date name=date required><input name=creditor placeholder="Kreditur" required><input name=desc placeholder="Keterangan"><div class="two"><input type=number name=amount min=1 step=100 placeholder="Jumlah Rp" required><input type=date name=dueDate></div><button class="primary">Simpan Hutang</button></form>
+      </div>
+    </div>
+    <div class="panel command-panel"><div class="panel-head"><div><h2>Piutang Penjualan</h2><small>Langsung lunasi atau hapus dari dashboard</small></div><span id="receivableTotal" class="command-total"></span></div><div id="dashboardReceivables" class="receivable-list"></div></div>
+  </div>
+  <div class="command-grid lower">
+    <div class="panel command-panel"><div class="panel-head"><div><h2>Kontrol Produksi</h2><small>Batch terbaru, output, susut dan rendemen</small></div></div><div id="dashboardProductionControl"></div></div>
+    <div class="panel command-panel"><div class="panel-head"><div><h2>Agenda & Peringatan</h2><small>Hal yang perlu ditangani hari ini</small></div></div><div id="dashboardAlerts"></div></div>
+  </div>
+</div>
+
+<div class="section-block full-stats-section">
+<div class="section-label">FULL STATISTIK — SEMUA DATA UTAMA</div>
+<div class="full-stats-grid" id="fullStatsGrid"></div>
+<div class="full-stats-two">
+  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Penjualan</h2><small>Omzet, transaksi, volume, harga jual dan status pembayaran</small></div></div><div id="fullSalesStats" class="stat-table-wrap"></div></div>
+  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Keuangan</h2><small>Arus uang, HPP, biaya, laba, margin dan kewajiban</small></div></div><div id="fullFinanceStats" class="stat-table-wrap"></div></div>
+</div>
+<div class="full-stats-two">
+  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Produksi</h2><small>Total batch, input, output, susut, rendemen dan HPP</small></div></div><div id="fullProductionStats" class="stat-table-wrap"></div></div>
+  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Posisi bahan baku dan barang jadi saat ini</small></div></div><div id="fullStockStats" class="stat-table-wrap"></div></div>
+</div>
+</div>
+
 <div class="section-block">
 <div class="section-label">Bahan Baku &amp; Barang Jadi</div>
 <div class="panel stock-panel">
@@ -55,7 +90,7 @@
 
 <div class="section-divider"><span>Keuangan</span></div>
 
-<details class="finance-toggle" id="financeSection">
+<details class="finance-toggle" id="financeSection" open>
 <summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
 <div class="finance-body">
 

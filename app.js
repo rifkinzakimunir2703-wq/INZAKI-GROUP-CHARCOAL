@@ -351,7 +351,7 @@ $('#salesBatch').innerHTML=S.batches.filter(b=>b.output-sold(b.id)>0).map(b=>`<o
 let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td data-label="Batch">${b.code}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(sold(b.id))}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
 $('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
 animateNum(['fQty'],tq,kg);animateNum(['fValue'],tv,rp);animateNum(['fAvg'],tq?tv/tq:0,rp);
-$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0);return `<tr><td data-label="Tanggal">${x.date}</td><td data-label="Batch">${b?.code||'-'}</td><td data-label="Pelanggan">${esc(x.customer||'')}</td><td data-label="Qty">${kg(x.qty)}</td><td data-label="Omzet">${rp(x.total)}</td><td data-label="HPP">${rp(c)}</td><td data-label="Laba">${signed(x.total-c)}</td><td data-label="Aksi"><button onclick="deleteSale('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(8);
+$('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0),status=x.status||'Lunas';return `<tr><td data-label="Tanggal">${x.date}</td><td data-label="Batch">${b?.code||'-'}</td><td data-label="Pelanggan">${esc(x.customer||'')}</td><td data-label="Qty">${kg(x.qty)}</td><td data-label="Omzet">${rp(x.total)}</td><td data-label="HPP">${rp(c)}</td><td data-label="Laba">${signed(x.total-c)}</td><td data-label="Status"><span class="badge ${status==='Lunas'?'badge-ok':'badge-pending'}">${esc(status)}</span></td><td data-label="Aksi">${status!=='Lunas'?`<button onclick="markSalePaid('${x.id}')" class="btn-pay">${ICON.cash} Lunas</button>`:''}<button onclick="deleteSale('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(9);
 $('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td data-label="Tanggal">${x.date}</td><td data-label="Kategori">${x.cat}</td><td data-label="Deskripsi">${esc(x.desc)}</td><td data-label="Jumlah">${rp(x.amount)}</td><td data-label="Aksi"><button onclick="deleteExpense('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(5);
 $('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td data-label="Tanggal">${d.date}</td><td data-label="Kreditur">${esc(d.creditor)}</td><td data-label="Keterangan">${esc(d.desc||'-')}</td><td data-label="Jumlah">${rp(d.amount)}</td><td data-label="Terbayar">${rp(d.paidAmount)}</td><td data-label="Sisa">${rp(r)}</td><td data-label="Jatuh Tempo">${d.dueDate||'-'}</td><td data-label="Status"><span class="badge ${st.cls}">${st.label}</span></td><td data-label="Aksi">${r>0?`<button onclick="payDebt('${d.id}')" class="btn-pay">${ICON.cash} Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(9);
 /* Statistik Produksi Lengkap (akumulasi seluruh waktu, per lini produksi) — tampil di halaman Laporan & juga di Dashboard */
@@ -397,6 +397,21 @@ async function deleteSale(id) {
     render();
     alert('✅ Penjualan berhasil dihapus!');
 }
+
+// Tandai piutang penjualan sebagai LUNAS
+async function markSalePaid(id){
+    if(!requireAdmin())return;
+    const sale=S.sales.find(x=>x.id===id);
+    if(!sale)return alert('Data piutang tidak ditemukan!');
+    if((sale.status||'Lunas')==='Lunas')return alert('Transaksi ini sudah lunas.');
+    if(!confirm(`Tandai piutang menjadi LUNAS?\n\nPelanggan: ${sale.customer||'Umum'}\nNilai: ${rp(sale.total)}`))return;
+    const {data,error}=await sb.from('sales').update({status:'Lunas'}).eq('id',id).select().single();
+    if(error)return alert('Gagal menandai lunas: '+error.message);
+    Object.assign(sale,mapSale(data));
+    render();
+    alert('✅ Piutang berhasil ditandai LUNAS.');
+}
+window.markSalePaid=markSalePaid;
 
 // Hapus Batch
 async function deleteBatch(id) {
@@ -727,8 +742,65 @@ $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')}
     return alerts.slice(0,30)
   }
 
+  async function quickInsert(table,payload,mapFn){
+    if(!requireAdmin())return null;
+    const {data,error}=await sb.from(table).insert(payload).select().single();
+    if(error){alert('Gagal menyimpan: '+error.message);return null;}
+    return mapFn(data);
+  }
+
+  function renderCommandCenter(){
+    const dateEl=$('#commandDate');if(dateEl)dateEl.textContent=new Date().toLocaleString('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    const out=sum(S.batches,x=>x.output),inp=sum(S.batches,x=>x.input),soldQty=sum(S.sales,x=>x.qty),revenue=sum(S.sales,x=>x.total),cogs=sum(S.sales,x=>{const b=B(x.batchId);return b?safe(x.qty)*safe(b.hppkg):0}),expenses=sum(S.expenses,x=>x.amount),receivable=sum(S.sales.filter(x=>(x.status||'Lunas')!=='Lunas'),x=>x.total),debt=sum(S.debts,x=>debtRemaining(x)),cash=revenue-receivable-expenses,profit=revenue-cogs-expenses,finished=Math.max(0,out-soldQty),yield=inp?out/inp*100:0;
+    const k=[['Omzet',money(revenue),'Semua penjualan'],['Laba Bersih',money(profit),profit>=0?'Positif':'Negatif'],['Kas Masuk Bersih',money(cash),'Omzet lunas − pengeluaran'],['Piutang',money(receivable),'Belum lunas'],['Stok Jadi',kg(finished),'Estimasi stok tersedia'],['Rendemen',pct(yield),yield>=27?'Target tercapai':'Di bawah target'],['Hutang',money(debt),'Sisa kewajiban'],['Produksi',kg(out),'Output seluruh batch']];
+    $('#commandKpis').innerHTML=k.map(x=>`<div class="command-kpi"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('');
+    /* V10.3 FULL STATISTICS — semua statistik penting dipadatkan ke dashboard utama */
+    const paidSales=S.sales.filter(x=>(x.status||'Lunas')==='Lunas'), unpaidSales=S.sales.filter(x=>(x.status||'Lunas')!=='Lunas');
+    const tx=S.sales.length, paidCount=paidSales.length, unpaidCount=unpaidSales.length, avgTicket=tx?revenue/tx:0, avgSellKg=soldQty?safe(revenue/soldQty):0;
+    const rawValue=sum(S.raw,x=>safe(x.qty)*landed(x)), finishedValue=sum(S.batches,x=>Math.max(0,safe(x.output)-soldV10(x.id))*safe(x.hppkg));
+    const hppProduced=sum(S.batches,x=>safe(x.totalHpp)), avgHppKg=out?hppProduced/out:0, totalLoss=Math.max(0,inp-out), lossPct=inp?totalLoss/inp*100:0;
+    const debtPaid=sum(S.debts,x=>safe(x.paidAmount)), debtTotal=sum(S.debts,x=>safe(x.amount)), debtCount=S.debts.length, debtOverdue=S.debts.filter(x=>debtRemaining(x)>0&&x.dueDate&&new Date(x.dueDate)<new Date()).length;
+    const expenseCount=S.expenses.length, avgExpense=expenseCount?expenses/expenseCount:0, margin=revenue?(profit/revenue*100):0, cashLunas=sum(paidSales,x=>x.total)-expenses;
+    const statCards=[
+      ['Total Transaksi',tx,'Penjualan tercatat'],['Transaksi Lunas',paidCount,'Sudah dibayar'],['Transaksi Piutang',unpaidCount,'Belum lunas'],['Rata-rata Transaksi',money(avgTicket),'Nilai per transaksi'],
+      ['Volume Terjual',kg(soldQty),'Total kg terjual'],['Harga Jual Rata²',money(avgSellKg)+'/kg','Rata-rata harga aktual'],['Omzet Lunas',money(sum(paidSales,x=>x.total)),'Kas dari penjualan lunas'],['Piutang Aktif',money(receivable),'Tagihan pelanggan'],
+      ['Total Batch',S.batches.length,'Produksi tercatat'],['Bahan Masuk',kg(inp),'Total input produksi'],['Output Jadi',kg(out),'Total hasil produksi'],['Total Susut',kg(totalLoss),'Bahan hilang/penyusutan'],
+      ['Rendemen',pct(yield),'Output ÷ input'],['HPP Produksi',money(hppProduced),'Total biaya batch'],['HPP Rata²',money(avgHppKg)+'/kg','HPP output rata-rata'],['Stok Jadi',kg(finished),'Estimasi belum terjual'],
+      ['Nilai Stok Jadi',money(finishedValue),'Nilai HPP stok'],['Stok Bahan',kg(rawQty),'Bahan baku tersisa'],['Nilai Bahan',money(rawValue),'Nilai stok bahan'],['Jenis Bahan',new Set(S.raw.map(x=>(x.name||'').trim().toLowerCase()).filter(Boolean)).size,'Jenis bahan tercatat'],
+      ['Pengeluaran',money(expenses),'Total biaya umum'],['Jumlah Pengeluaran',expenseCount,'Transaksi biaya'],['Rata² Pengeluaran',money(avgExpense),'Per transaksi'],['Laba Bersih',money(profit),`Margin ${margin.toFixed(1)}%`],
+      ['Kas Operasional',money(cashLunas),'Penjualan lunas − biaya'],['Total Hutang',money(debtTotal),'Nilai kewajiban'],['Hutang Tersisa',money(debt),'Belum dibayar'],['Hutang Terbayar',money(debtPaid),'Akumulasi pembayaran'],
+      ['Kreditur Aktif',S.debts.filter(x=>debtRemaining(x)>0).length,'Hutang masih berjalan'],['Jatuh Tempo Lewat',debtOverdue,'Hutang overdue'],['Margin Bersih',margin.toFixed(1)+'%','Laba bersih ÷ omzet'],['Rasio Piutang',revenue?(receivable/revenue*100).toFixed(1)+'%':'0%','Piutang ÷ omzet']
+    ];
+    const cardCls=(name)=>name==='Laba Bersih'?(profit<0?'bad':'good'):['Piutang Aktif','Hutang Tersisa','Jatuh Tempo Lewat'].includes(name)?'warn':'';
+    if($('#fullStatsGrid'))$('#fullStatsGrid').innerHTML=statCards.map(x=>`<div class="full-stat-card ${cardCls(x[0])}"><span>${x[0]}</span><b>${x[1]}</b><small>${x[2]}</small></div>`).join('');
+    if($('#fullSalesStats'))$('#fullSalesStats').innerHTML=`<table><tbody><tr><td>Total transaksi</td><td>${tx}</td></tr><tr><td>Transaksi lunas</td><td>${paidCount}</td></tr><tr><td>Transaksi piutang</td><td>${unpaidCount}</td></tr><tr><td>Omzet total</td><td>${money(revenue)}</td></tr><tr><td>Omzet sudah lunas</td><td>${money(sum(paidSales,x=>x.total))}</td></tr><tr><td>Piutang aktif</td><td>${money(receivable)}</td></tr><tr><td>Volume terjual</td><td>${kg(soldQty)}</td></tr><tr><td>Harga jual rata-rata</td><td>${money(avgSellKg)}/kg</td></tr><tr><td>Nilai transaksi rata-rata</td><td>${money(avgTicket)}</td></tr></tbody></table>`;
+    if($('#fullFinanceStats'))$('#fullFinanceStats').innerHTML=`<table><tbody><tr><td>Omzet</td><td>${money(revenue)}</td></tr><tr><td>HPP terjual</td><td>${money(cogs)}</td></tr><tr><td>Laba kotor</td><td>${money(revenue-cogs)}</td></tr><tr><td>Pengeluaran umum</td><td>${money(expenses)}</td></tr><tr><td>Laba bersih</td><td>${money(profit)}</td></tr><tr><td>Margin bersih</td><td>${margin.toFixed(1)}%</td></tr><tr><td>Kas operasional sederhana</td><td>${money(cashLunas)}</td></tr><tr><td>Hutang tersisa</td><td>${money(debt)}</td></tr><tr><td>Piutang aktif</td><td>${money(receivable)}</td></tr></tbody></table>`;
+    if($('#fullProductionStats'))$('#fullProductionStats').innerHTML=`<table><tbody><tr><td>Total batch</td><td>${S.batches.length}</td></tr><tr><td>Hari produksi</td><td>${new Set(S.batches.map(b=>b.date).filter(Boolean)).size}</td></tr><tr><td>Bahan masuk</td><td>${kg(inp)}</td></tr><tr><td>Output jadi</td><td>${kg(out)}</td></tr><tr><td>Total susut</td><td>${kg(totalLoss)}</td></tr><tr><td>Persentase susut</td><td>${lossPct.toFixed(1)}%</td></tr><tr><td>Rendemen</td><td>${yield.toFixed(1)}%</td></tr><tr><td>Total HPP produksi</td><td>${money(hppProduced)}</td></tr><tr><td>HPP rata-rata output</td><td>${money(avgHppKg)}/kg</td></tr></tbody></table>`;
+    if($('#fullStockStats'))$('#fullStockStats').innerHTML=`<table><tbody><tr><td>Stok bahan baku</td><td>${kg(rawQty)}</td></tr><tr><td>Nilai bahan baku</td><td>${money(rawValue)}</td></tr><tr><td>Jenis bahan</td><td>${new Set(S.raw.map(x=>(x.name||'').trim().toLowerCase()).filter(Boolean)).size}</td></tr><tr><td>Stok barang jadi</td><td>${kg(finished)}</td></tr><tr><td>Nilai stok jadi</td><td>${money(finishedValue)}</td></tr><tr><td>Jenis produk</td><td>${new Set(S.batches.map(x=>(x.productName||'').trim().toLowerCase()).filter(Boolean)).size}</td></tr></tbody></table>`;
+    const paid=S.sales.filter(x=>(x.status||'Lunas')==='Lunas');
+    $('#receivableTotal').textContent=money(receivable);
+    $('#dashboardReceivables').innerHTML=S.sales.filter(x=>(x.status||'Lunas')!=='Lunas').slice().reverse().map(x=>{const b=B(x.batchId);return `<div class="receivable-row"><div><b>${esc(x.customer||'Umum')}</b><small>${x.invoice_no||'Tanpa invoice'} · ${fmtDate(x.date)} · ${kg(x.qty)} · ${money(x.total)}</small></div><div class="receivable-actions"><button class="btn-lunas" onclick="markSalePaid('${x.id}')">✓ Lunas</button><button class="btn-delete-mini" onclick="deleteSale('${x.id}')">Hapus</button></div></div>`}).join('')||'<div class="empty-command">Tidak ada piutang. Semua penjualan sudah lunas.</div>';
+    $('#dashboardProductionControl').innerHTML=S.batches.slice().reverse().slice(0,6).map(b=>`<div class="control-row"><div><b>${esc(b.code)}</b><small>${esc(b.productName)} · ${fmtDate(b.date)}</small></div><div class="metric">${kg(b.output)}</div><div class="metric">Susut ${safe(b.lossPct).toFixed(1)}%</div><div class="metric">Rend. ${safe(b.input)?(safe(b.output)/safe(b.input)*100).toFixed(1):'0.0'}%</div></div>`).join('')||'<div class="empty-command">Belum ada batch produksi.</div>';
+    const alerts=buildAlerts();
+    $('#dashboardAlerts').innerHTML=alerts.slice(0,7).map(a=>`<div class="alert-compact ${a.type}"><div><b>${escV(a.title)}</b><small>${escV(a.body)}</small></div></div>`).join('')||'<div class="empty-command">Tidak ada peringatan aktif.</div>';
+    const qr=$('#quickSalesBatch');if(qr)qr.innerHTML=S.batches.filter(b=>safe(b.output)-soldV10(b.id)>0).map(b=>`<option value="${b.id}">${esc(b.code)} · ${esc(b.productName)} · sisa ${kg(safe(b.output)-soldV10(b.id))}</option>`).join('');
+    const rr=$('#quickBatchRaw');if(rr)rr.innerHTML=S.raw.filter(r=>safe(r.qty)>0).map(r=>`<option value="${r.id}">${esc(r.name)} · ${kg(r.qty)}</option>`).join('');
+  }
+
+  function bindQuickForms(){
+    if(window.__quickFormsBound)return;window.__quickFormsBound=true;
+    ['quickSalesForm','quickRawForm','quickExpenseForm','quickDebtForm','quickBatchForm'].forEach(id=>{const f=$('#'+id);if(f)f.querySelector('[name="date"]').value=today;});
+    $('#quickSalesForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!requireAdmin())return;const x=Object.fromEntries(new FormData(e.currentTarget)),b=B(x.batchId);if(!b||+x.qty>safe(b.output)-soldV10(b.id))return alert('Stok batch tidak mencukupi.');const payload={invoice_no:`INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`,date:x.date,batch_id:b.id,customer_name:x.customer||'Umum',qty:+x.qty,price:+x.price,total:+x.qty*+x.price,status:x.status};const d=await quickInsert('sales',payload,mapSale);if(d){S.sales.push(d);e.currentTarget.reset();e.currentTarget.date.value=today;render();alert('✅ Penjualan tersimpan.');}});
+    $('#quickRawForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!requireAdmin())return;const x=Object.fromEntries(new FormData(e.currentTarget)),q=+x.qty;const d=await quickInsert('raw_materials',{date:x.date,name:x.name,qty:q,original_qty:q,price:+x.price||0,transport:+x.transport||0,other:0,supplier:x.supplier||null},mapRaw);if(d){S.raw.push(d);e.currentTarget.reset();e.currentTarget.date.value=today;render();alert('✅ Bahan baku tersimpan.');}});
+    $('#quickExpenseForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!requireAdmin())return;const x=Object.fromEntries(new FormData(e.currentTarget)),d=await quickInsert('expenses',{date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount},mapExpense);if(d){S.expenses.push(d);e.currentTarget.reset();e.currentTarget.date.value=today;render();alert('✅ Pengeluaran tersimpan.');}});
+    $('#quickDebtForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!requireAdmin())return;const x=Object.fromEntries(new FormData(e.currentTarget)),d=await quickInsert('debts',{date:x.date,creditor:x.creditor,desc:x.desc||null,amount:+x.amount,due_date:x.dueDate||null,paid_amount:0},mapDebt);if(d){S.debts.push(d);e.currentTarget.reset();e.currentTarget.date.value=today;render();alert('✅ Hutang tersimpan.');}});
+    $('#quickBatchForm')?.addEventListener('submit',async e=>{e.preventDefault();if(!requireAdmin())return;const x=Object.fromEntries(new FormData(e.currentTarget)),r=S.raw.find(z=>z.id==x.rawId);if(!r||+x.inputQty>safe(r.qty))return alert('Stok bahan baku tidak mencukupi.');if(+x.outputQty<=0)return alert('Hasil produksi harus lebih dari 0.');const material=+x.inputQty*landed(r),total=material+(+x.labor||0)+(+x.energy||0),loss=+x.inputQty-+x.outputQty,n=S.batches.length+1;const d=await quickInsert('batches',{code:`BCH-${x.date.slice(0,4)}-${String(n).padStart(3,'0')}`,date:x.date,raw_id:r.id,raw_name:r.name,product_name:x.productName,input:+x.inputQty,output:+x.outputQty,loss,loss_pct:loss/+x.inputQty*100,total_hpp:total,hpp_kg:total/+x.outputQty,labor:+x.labor||0,energy:+x.energy||0,other:0,note:null},mapBatch);if(d){const newQty=safe(r.qty)-+x.inputQty;const {error}=await sb.from('raw_materials').update({qty:newQty}).eq('id',r.id);if(error)return alert('Batch tersimpan, tetapi stok bahan gagal diperbarui: '+error.message);r.qty=newQty;S.batches.push(d);e.currentTarget.reset();e.currentTarget.date.value=today;render();alert('✅ Produksi batch tersimpan.');}});
+  }
+
   function renderV10(){
     if(!document.getElementById('v10ops'))return;
+    bindQuickForms();
+    renderCommandCenter();
     const out=S.batches.reduce((a,b)=>a+safe(b.output),0), inp=S.batches.reduce((a,b)=>a+safe(b.input),0), soldQty=sum(S.sales,x=>x.qty), revenue=sum(S.sales,x=>x.total), cogs=sum(S.sales,x=>{const b=B(x.batchId);return b?safe(x.qty)*safe(b.hppkg):0}), expenses=sum(S.expenses,x=>x.amount), debt=sum(S.debts,x=>debtRemaining(x));
     const profit=revenue-cogs-expenses, finished=Math.max(0,out-soldQty), rawQty=sum(S.raw,x=>x.qty), yield=inp?out/inp*100:0;
     const kpis=[['Penjualan',money(revenue),'Omzet seluruh transaksi','good'],['Laba Bersih',money(profit),'Omzet − HPP terjual − pengeluaran',profit>=0?'good':'bad'],['Stok Produk',kg(finished),'Produk jadi yang belum terjual','info'],['Rendemen',pct(yield),'Output ÷ bahan masuk',yield>=27?'good':'warn'],['Hutang',money(debt),'Sisa kewajiban','warn'],['Bahan Baku',kg(rawQty),'Stok bahan tersisa','info']];
