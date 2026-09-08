@@ -75,12 +75,17 @@
 <span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
 <span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
 </div>
-<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
+<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
+<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table>
 </div>
 
 <div class="panel">
 <div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div>
-<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
+<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
 </div>
 
 <div class="panel">
@@ -133,12 +138,28 @@
 <span>Total HPP Produksi<b id="psHpp">Rp0</b></span>
 <span>Total Hari Produksi<b id="psDays">0 hari</b></span>
 </div>
-<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table>
+<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
+<div class="bi-controls"><label>Target Margin (%)<input type="number" id="biMarginTarget" min="0" max="200" value="20" step="1"></label><p class="hint">BEP = harga jual impas (margin 0%). Harga Rekomendasi = HPP/kg × (1 + target margin).</p></div>
+<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTable"></tbody></table>
+</div>
+
+<div class="panel bi-sim-panel">
+<div class="panel-head"><div><h2>Simulasi Rendemen</h2><small>Lihat dampak kenaikan rendemen terhadap HPP/kg dan laba, per batch</small></div></div>
+<div class="bi-sim-controls">
+<label>Pilih Batch<select id="biSimBatch"></select></label>
+<label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
+<label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
+</div>
+<div id="biSimResult" class="bi-sim-result"></div>
 </div>
 
 <div class="panel">
 <div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Bahan evaluasi performa tiap batch produksi — laba/rugi dihitung dari yang sudah terjual</small></div></div>
-<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTable"></tbody></table>
+<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTable"></tbody></table>
 </div>
 
 <div class="panel">
