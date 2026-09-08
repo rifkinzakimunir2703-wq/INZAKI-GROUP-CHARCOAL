@@ -4,6 +4,7 @@ $$('input[type=date]').forEach(x=>x.value=today);
 
 let S={raw:[],batches:[],sales:[],expenses:[],debts:[]};
 let isAdmin=false;
+let DASH_RANGE={start:null,end:null};
 const ADMIN_PAGES=['raw','batch','sales','expenses','debts'];
 
 /* ---- Icons (inline SVG, no external deps) ---- */
@@ -130,37 +131,69 @@ async function initAuth(){
 /* ---- Charts ---- */
 let financeChart=null,productionChart=null;
 const PALETTE={ember:'#22C55E',gold:'#F5A524',red:'#F76E7E',green:'#22C55E',teal:'#2DD4CF',violet:'#A78BFA',ink:'#F1F4EF',muted:'#8E9A8B',grid:'rgba(255,255,255,.08)'};
+function getDashRange(){
+  let s=DASH_RANGE.start,e=DASH_RANGE.end;
+  return {
+    batches:S.batches.filter(b=>!s||!e||(!b.date||(b.date>=s&&b.date<=e))),
+    sales:S.sales.filter(x=>!s||!e||(!x.date||(x.date>=s&&x.date<=e))),
+    expenses:S.expenses.filter(x=>!s||!e||(!x.date||(x.date>=s&&x.date<=e)))
+  };
+}
 function drawCharts(){
- if(typeof Chart==='undefined')return;
- Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
- const sel=$('#chartYear');if(!sel)return;
- const years=new Set([new Date().getFullYear()]);
- [...S.sales,...S.expenses,...S.batches].forEach(x=>{if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())});
- const old=+sel.value||new Date().getFullYear();
- sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
- sel.value=years.has(old)?old:new Date().getFullYear();
- const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
- const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
- S.sales.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){let i=d.getMonth(),b=B(x.batchId);omzet[i]+=+x.total||0;if(b)hpp[i]+=(+x.qty||0)*b.hppkg}});
- S.expenses.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0});
- S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
- for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
- const grid={color:PALETTE.grid};
- const isSmall=window.innerWidth<=520;
- const legendFont={size:isSmall?10:12};
- const tickFont={size:isSmall?9.5:11};
- if(financeChart)financeChart.destroy();
- financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[
-   {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2,pointBackgroundColor:PALETTE.gold},
-   {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.teal,backgroundColor:PALETTE.teal,pointRadius:0},
-   {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,backgroundColor:PALETTE.red,pointRadius:0},
-   {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(34,197,94,.14)',fill:true,pointRadius:2,pointBackgroundColor:PALETTE.ember}
- ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{grid,ticks:{font:tickFont,callback:v=>rp(v)}}}}});
- if(productionChart)productionChart.destroy();
- productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels,datasets:[
-   {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
-   {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
- ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}}}}});
+  if(typeof Chart==='undefined')return;
+  Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
+  const range=getDashRange(),db=range.batches,ds=range.sales,de=range.expenses;
+  const sel=$('#chartYear'); if(!sel)return;
+  const years=new Set([new Date().getFullYear()]);
+  [...S.sales,...S.expenses,...S.batches].forEach(x=>{if(x.date)years.add(new Date(x.date+'T00:00:00').getFullYear())});
+  const old=+sel.value||new Date().getFullYear();
+  sel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value=years.has(old)?old:new Date().getFullYear();
+  const year=+sel.value,labels=Array.from({length:12},(_,i)=>new Date(year,i,1).toLocaleDateString('id-ID',{month:'short'}));
+  const omzet=Array(12).fill(0),hpp=Array(12).fill(0),expense=Array(12).fill(0),profit=Array(12).fill(0),input=Array(12).fill(0),output=Array(12).fill(0);
+  S.sales.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){let i=d.getMonth(),b=B(x.batchId);omzet[i]+=+x.total||0;if(b)hpp[i]+=(+x.qty||0)*b.hppkg}});
+  S.expenses.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year)expense[d.getMonth()]+=+x.amount||0});
+  S.batches.forEach(x=>{let d=new Date(x.date+'T00:00:00');if(d.getFullYear()===year){input[d.getMonth()]+=+x.input||0;output[d.getMonth()]+=+x.output||0}});
+  for(let i=0;i<12;i++)profit[i]=omzet[i]-hpp[i]-expense[i];
+  const isSmall=window.innerWidth<=520,legendFont={size:isSmall?10:12},tickFont={size:isSmall?9.5:11},grid={color:PALETTE.grid};
+  if(financeChart)financeChart.destroy();
+  financeChart=new Chart($('#financeChart'),{type:'line',data:{labels,datasets:[
+    {label:'Omzet',data:omzet,tension:.35,borderWidth:2.5,borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,pointRadius:2},
+    {label:'HPP',data:hpp,tension:.35,borderWidth:2,borderColor:PALETTE.teal,pointRadius:0},
+    {label:'Pengeluaran',data:expense,tension:.35,borderWidth:2,borderColor:PALETTE.red,pointRadius:0},
+    {label:'Laba',data:profit,tension:.35,borderWidth:3,borderColor:PALETTE.ember,backgroundColor:'rgba(34,197,94,.14)',fill:true,pointRadius:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{grid,ticks:{font:tickFont,callback:v=>rp(v)}}}}});
+  // Mockup: batch production vs yield
+  if(productionChart)productionChart.destroy();
+  const sorted=db.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(-12);
+  productionChart=new Chart($('#productionChart'),{type:'bar',data:{labels:sorted.map(b=>b.code),datasets:[
+    {type:'bar',label:'Bahan masuk (kg)',data:sorted.map(b=>b.input),backgroundColor:'rgba(34,197,94,.65)',borderRadius:5,yAxisID:'y'},
+    {type:'bar',label:'Produksi (kg)',data:sorted.map(b=>b.output),backgroundColor:'rgba(59,130,246,.78)',borderRadius:5,yAxisID:'y'},
+    {type:'line',label:'Rendemen (%)',data:sorted.map(b=>yieldPct(b)),borderColor:PALETTE.gold,backgroundColor:PALETTE.gold,borderWidth:2.2,tension:.3,pointRadius:2,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,usePointStyle:true,boxWidth:8,font:legendFont}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}},y1:{position:'right',beginAtZero:true,max:100,grid:{drawOnChartArea:false},ticks:{font:tickFont,callback:v=>v+'%'}}}}});
+  // Mockup: HPP, price, margin per batch
+  const marginEl=$('#marginChart');
+  if(marginEl){
+    if(window.marginChart)window.marginChart.destroy();
+    const rows=sorted;
+    const prices=rows.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),q=ss.reduce((a,x)=>a+x.qty,0),rev=ss.reduce((a,x)=>a+x.total,0);return q?rev/q:0});
+    const margins=rows.map((b,i)=>prices[i]-b.hppkg);
+    window.marginChart=new Chart(marginEl,{type:'bar',data:{labels:rows.map(b=>b.code),datasets:[
+      {label:'HPP/kg',data:rows.map(b=>b.hppkg),backgroundColor:'rgba(34,197,94,.75)',borderRadius:5},
+      {label:'Harga jual/kg',data:prices,backgroundColor:'rgba(59,130,246,.75)',borderRadius:5},
+      {label:'Margin/kg',data:margins,backgroundColor:PALETTE.red,borderRadius:5}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,usePointStyle:true,boxWidth:8,font:legendFont}}},scales:{x:{grid,ticks:{font:tickFont}},y:{grid,ticks:{font:tickFont,callback:v=>rp(v)}}}}});
+  }
+  const trendEl=$('#trendChart');
+  if(trendEl){
+    if(window.trendChart)window.trendChart.destroy();
+    const lossRows=sorted.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),rev=ss.reduce((a,x)=>a+x.total,0),c=ss.reduce((a,x)=>a+x.qty*b.hppkg,0);return rev-c});
+    window.trendChart=new Chart(trendEl,{type:'line',data:{labels:sorted.map(b=>b.code),datasets:[
+      {label:'Produksi (kg)',data:sorted.map(b=>b.output),borderColor:PALETTE.ember,backgroundColor:PALETTE.ember,tension:.3,yAxisID:'y',pointRadius:2},
+      {label:'HPP/kg',data:sorted.map(b=>b.hppkg),borderColor:'#3B82F6',backgroundColor:'#3B82F6',tension:.3,yAxisID:'y1',pointRadius:2},
+      {label:'Untung/Rugi',data:lossRows,borderColor:PALETTE.red,backgroundColor:PALETTE.red,tension:.3,yAxisID:'y2',pointRadius:2}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,usePointStyle:true,boxWidth:8,font:legendFont}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:tickFont,callback:v=>rp(v)}},y2:{display:false}}}});
+  }
 }
 
 /* ---- Chart komposisi biaya (donut) — dipakai untuk 2 canvas (Laporan & Dashboard) ---- */
@@ -207,6 +240,27 @@ function render(){
 let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=S.batches.reduce((a,x)=>a+x.output,0),inp=S.batches.reduce((a,x)=>a+x.input,0),loss=inp-out;
 let finishedQty=out-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
 let ws=S.sales.filter(x=>last7(x.date)),ms=S.sales.filter(x=>thisMonth(x.date)),we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
+/* ---- Dashboard period + mockup KPI ---- */
+let dash=getDashRange(),db=dash.batches,ds=dash.sales,de=dash.expenses;
+let dashRawQty=db.reduce((a,b)=>a+b.input,0),dashOut=db.reduce((a,b)=>a+b.output,0),dashHpp=db.reduce((a,b)=>a+b.totalHpp,0);
+let dashSales=ds.reduce((a,x)=>a+x.total,0),dashYield=dashRawQty?dashOut/dashRawQty*100:0;
+let dashLoss=0;
+db.forEach(b=>{let ss=ds.filter(x=>x.batchId==b.id),rev=ss.reduce((a,x)=>a+x.total,0),c=ss.reduce((a,x)=>a+x.qty*b.hppkg,0);if(rev-c<0)dashLoss+=Math.abs(rev-c)});
+let kpiSet=(id,val,fn)=>{let e=$('#'+id);if(e)e.textContent=fn(val)};
+kpiSet('kpiRaw',dashRawQty,kg);kpiSet('kpiOutput',dashOut,kg);kpiSet('kpiYield',dashYield,v=>v.toFixed(1)+'%');kpiSet('kpiHpp',dashHpp,rp);kpiSet('kpiSales',dashSales,rp);kpiSet('kpiLoss',dashLoss,rp);
+if($('#kpiYieldTrend'))$('#kpiYieldTrend').textContent=dashYield>=27?'✓ Di atas target 27%':'⚠ Di bawah target 27%';
+if($('#kpiRawTrend'))$('#kpiRawTrend').textContent=`${db.length} batch dalam periode`;
+if($('#kpiOutputTrend'))$('#kpiOutputTrend').textContent=`Rendemen ${dashYield.toFixed(1)}%`;
+if($('#kpiHppTrend'))$('#kpiHppTrend').textContent=dashOut?`${rp(dashHpp/dashOut)}/kg rata-rata`:'Belum ada produksi';
+if($('#kpiSalesTrend'))$('#kpiSalesTrend').textContent=`${ds.length} transaksi`;
+if($('#kpiLossTrend'))$('#kpiLossTrend').textContent=dashLoss?'Perlu evaluasi margin':'Tidak ada batch rugi';
+/* Detail batch sesuai gaya mockup */
+let detailHtml=db.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,6).map(b=>{
+  let ss=ds.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),profit=om-q*b.hppkg,yp=yieldPct(b),cls=profit<0?'neg':'pos';
+  return `<div class="batch-detail-card"><div class="bdc-head"><span class="bdc-code">${esc(b.code)} · ${esc(b.productName)}</span><span class="badge ${profit<0?'badge-overdue':'badge-ok'}">${profit<0?'Rugi':'Untung'}</span></div><div class="bdc-head"><small>${fmtDate(b.date)} · ${esc(b.rawName)}</small><b class="bdc-profit ${cls}">${profit<0?'-':''}${rp(Math.abs(profit))}</b></div><div class="bdc-meta"><div><span>Bahan Masuk</span><b>${kg(b.input)}</b></div><div><span>Produksi</span><b>${kg(b.output)}</b></div><div><span>Susut</span><b>${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</b></div><div><span>Rendemen</span><b>${yp.toFixed(1)}%</b></div><div><span>HPP/kg</span><b>${rp(b.hppkg)}</b></div><div><span>Harga Jual</span><b>${q?rp(om/q):'—'}</b></div><div><span>Terjual</span><b>${kg(q)}</b></div><div><span>Sisa</span><b>${kg(Math.max(0,b.output-q))}</b></div></div><div class="bdc-bar"><i style="width:${Math.min(100,Math.max(0,yp))}%"></i></div></div>`;
+}).join('');
+if($('#batchDetailList'))$('#batchDetailList').innerHTML=detailHtml||'<div class="stock-empty">Belum ada batch pada periode ini.</div>';
+
 let wc=ws.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),mc=ms.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0);
 /* Kartu stok terpisah per jenis: tiap bahan baku & tiap produk jadi dapat kartu sendiri */
 let normName=n=>(n||'').trim().toLowerCase();
@@ -416,6 +470,34 @@ async function deleteExpense(id) {
     alert('✅ Pengeluaran berhasil dihapus!');
 }
 
+
+/* ---- Dashboard period controls ---- */
+function setDashRange(kind){
+  let now=new Date(),end=new Date(now),start=new Date(now);
+  const iso=d=>{let x=new Date(d);return x.toISOString().slice(0,10)};
+  if(kind==='month'){start=new Date(now.getFullYear(),now.getMonth(),1);end=new Date(now.getFullYear(),now.getMonth()+1,0)}
+  else if(kind==='7d'){start.setDate(start.getDate()-6)}
+  else {DASH_RANGE={start:null,end:null};updateDashPeriodUI();render();return}
+  DASH_RANGE={start:iso(start),end:iso(end)};updateDashPeriodUI();render();
+}
+function updateDashPeriodUI(){
+  let s=DASH_RANGE.start,e=DASH_RANGE.end;
+  let label=s&&e?`${fmtDate(s)} – ${fmtDate(e)}`:'Semua periode';
+  if($('#dashPeriodLabel'))$('#dashPeriodLabel').textContent=label;
+  if($('#headerPeriod'))$('#headerPeriod').textContent=label;
+  if($('#dashStart'))$('#dashStart').value=s||'';
+  if($('#dashEnd'))$('#dashEnd').value=e||'';
+}
+document.addEventListener('click',e=>{let b=e.target.closest('.period-preset');if(b)setDashRange(b.dataset.range)});
+document.addEventListener('change',e=>{
+  if(e.target&&['dashStart','dashEnd'].includes(e.target.id)){
+    let s=$('#dashStart')?.value||null,e2=$('#dashEnd')?.value||null;
+    if(s&&e2&&s>e2){alert('Tanggal mulai tidak boleh melewati tanggal akhir.');return}
+    DASH_RANGE={start:s,end:e2};updateDashPeriodUI();render();
+  }
+});
+document.addEventListener('DOMContentLoaded',updateDashPeriodUI);
+
 /* ---- Navigation ---- */
 function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
@@ -597,6 +679,19 @@ document.addEventListener('change',e=>{if(e.target&&e.target.id==='biMarginTarge
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='biSimBatch'){$('#biSimPrice').dataset.batch='';updateBiSim()}});
 document.addEventListener('input',e=>{if(e.target&&(e.target.id==='biSimDelta'||e.target.id==='biSimPrice'))updateBiSim()});
 
+
+/* ---- Export & print dashboard ---- */
+function downloadText(name,text,type){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500);
+}
+function exportSalesCsv(){
+  let rows=[['Tanggal','Batch','Pelanggan','Qty (kg)','Harga/kg','Omzet','Status']];
+  S.sales.forEach(x=>{let b=B(x.batchId);rows.push([x.date,b?.code||'',x.customer||'',x.qty,x.price,x.total,x.status||''])});
+  downloadText('inzaki-penjualan.csv',rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv;charset=utf-8');
+}
+$('#exportCsv')?.addEventListener('click',exportSalesCsv);
+$('#printReport')?.addEventListener('click',()=>window.print());
+
 /* ---- Login / Logout ---- */
 $('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
 $('#financeLoginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
@@ -611,6 +706,9 @@ $('#loginForm').onsubmit=async e=>{
   $('#loginError').textContent='';$('#loginModal').classList.remove('show');e.target.reset();
 };
 $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')};
+
+/* Default dashboard period mengikuti bulan kalender aktif, seperti mockup */
+setDashRange('month');
 
 /* ---- Init ---- */
 (async function init(){
