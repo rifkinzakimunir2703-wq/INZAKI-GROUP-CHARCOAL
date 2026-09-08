@@ -12,216 +12,53 @@
 </aside>
 <main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
 <section id="dashboard" class="page active">
-
 <div class="section-block">
-<div class="section-label">Bahan Baku &amp; Barang Jadi</div>
-<div class="panel stock-panel">
-<div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Bahan baku dan barang jadi ditampilkan terpisah per jenis</small></div></div>
-<div id="stockCards" class="stock-cards"></div>
+<div class="section-label">Ringkasan Bisnis</div>
+<div class="cards global" id="summaryCards"></div>
 </div>
+<div class="charts-grid">
+<div class="panel chart-panel"><div class="panel-head"><div><h2>Perbandingan Produksi & Rendemen</h2><small>Bahan masuk vs produk jadi dan rendemen per batch</small></div></div><canvas id="productionChart"></canvas></div>
+<div class="panel chart-panel"><div class="panel-head"><div><h2>Biaya per Kg & Margin</h2><small>HPP, harga jual, dan margin per batch</small></div></div><canvas id="costMarginChart"></canvas></div>
 </div>
-
-<div class="section-block">
-<div class="section-label">Statistik Produksi per Lini</div>
-<div id="lineStatsCards" class="line-stats-grid"></div>
+<div class="panel cost-comp-panel"><div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div><div class="cost-comp-body"><div class="cost-chart-wrap"><canvas id="costChart"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotal">Rp0</b></div></div><div id="costLegend" class="cost-legend"></div></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Detail Batch Produksi</h2><small>Rincian performa tiap batch</small></div></div><div id="batchDetailList" class="batch-detail-grid"></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Insight & Rekomendasi</h2><small>Ringkasan otomatis dari data produksi & penjualan</small></div></div><div id="insightList" class="insight-list"></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Simulasi Peningkatan Rendemen</h2><small>Dampak kenaikan rendemen terhadap HPP dan laba</small></div></div><div id="biSimTable"></div></div>
+<div class="bi-grid-2">
+<div class="panel bep-panel"><div class="panel-head"><div><h2>BEP & Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div><div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValue">Rp0/kg</b></div><div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPrice">—</b></div><div><span>Selisih per kg</span><b id="bepGap">—</b></div></div><div id="bepCta" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div></div>
+<div class="panel chart-panel"><div class="panel-head"><div><h2>Tren Produksi & Kerugian</h2><small>HPP per kg dan kerugian per batch</small></div></div><canvas id="trendChart"></canvas></div>
 </div>
-
-<div class="panel batch-loss-panel">
-<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
-<div id="batchLossList" class="batch-loss-list"></div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
-<div id="insightList" class="insight-list"></div>
-</div>
-
-<div class="panel bi-sim-panel">
-<div class="panel-head"><div><h2>Simulasi Rendemen</h2><small>Lihat dampak kenaikan rendemen terhadap HPP/kg dan laba, per batch</small></div></div>
-<div class="bi-sim-controls">
-<label>Pilih Batch<select id="biSimBatch"></select></label>
-<label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
-<label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
-</div>
-<div id="biSimResult" class="bi-sim-result"></div>
-</div>
-
-<div class="panel chart-panel">
-<div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
-<canvas id="productionChart"></canvas>
-</div>
-
-<div class="panel"><div class="panel-head"><div><h2>Batch Terbaru</h2><small id="recentSub">5 batch produksi paling akhir</small></div></div><div id="recent"></div></div>
-
-<div class="section-divider"><span>Keuangan</span></div>
 
 <details class="finance-toggle" id="financeSection">
-<summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
+<summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan & Laporan Lengkap</h2><small>Laba, pengeluaran, hutang & laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
 <div class="finance-body">
-
-<div id="financeLocked" class="finance-locked">
-<span class="lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></svg></span>
-<p>Data keuangan bersifat rahasia dan hanya bisa dilihat setelah login sebagai admin.</p>
-<button class="ghost small" id="financeLoginBtn">Login Admin</button>
-</div>
-
+<div id="financeLocked" class="finance-locked"><span class="lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></svg></span><p>Data keuangan bersifat rahasia dan hanya bisa dilihat setelah login sebagai admin.</p><button class="ghost small" id="financeLoginBtn">Login Admin</button></div>
 <div id="financeContent">
-
 <div class="cards global">
 <div><span>Laba Mingguan</span><b id="dProfitWeek">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Pengeluaran Mingguan</span><b id="dExpenseWeek">Rp0</b></div>
 <div><span>Pengeluaran Bulanan</span><b id="dExpenseMonth">Rp0</b></div>
 <div class="span-full"><span>Hutang Perusahaan (Sisa Belum Lunas)</span><b id="dDebtOutstanding">Rp0</b><small id="dDebtInfo">0 kreditur aktif</small><div id="dDebtBreakdown" class="breakdown"></div></div></div>
-
-<div class="panel chart-panel">
-<div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div>
-<canvas id="financeChart"></canvas>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div>
-<div class="stats prod-overview">
-<span>Total Batch<b id="psBatchesD">0</b></span>
-<span>Total Bahan Masuk<b id="psInputD">0 kg</b></span>
-<span>Total Barang Jadi<b id="psOutputD">0 kg</b></span>
-<span>Total Susut<b id="psLossD">0 kg</b></span>
-<span>Rata-rata Susut<b id="psLossPctD">0%</b></span>
-<span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
-<span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
-</div>
-<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
-<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table>
-</div>
-
+<div class="panel chart-panel"><div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div><canvas id="financeChart"></canvas></div>
+<div class="panel"><div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div><div class="stats prod-overview"><span>Total Batch<b id="psBatchesD">0</b></span><span>Total Bahan Masuk<b id="psInputD">0 kg</b></span><span>Total Barang Jadi<b id="psOutputD">0 kg</b></span><span>Total Susut<b id="psLossD">0 kg</b></span><span>Rata-rata Susut<b id="psLossPctD">0%</b></span><span>Total HPP Produksi<b id="psHppD">Rp0</b></span><span>Total Hari Produksi<b id="psDaysD">0 hari</b></span></div><table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table></div>
+<div class="panel"><div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div><table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table></div>
 <div class="bi-grid-2">
-<div class="panel bep-panel">
-<div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div>
-<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValueD">Rp0/kg</b></div>
-<div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPriceD">—</b></div><div><span>Selisih per kg</span><b id="bepGapD">—</b></div></div>
-<div id="bepCtaD" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
-</div>
-
-<div class="panel cost-comp-panel">
-<div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div>
-<div class="cost-comp-body">
-<div class="cost-chart-wrap"><canvas id="costChartD"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotalD">Rp0</b></div></div>
-<div id="costLegendD" class="cost-legend"></div>
-</div>
-</div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
-<div id="insightListD" class="insight-list"></div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div>
-<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
-<div class="report" id="reportD"></div>
-</div>
-
-</div>
-</div>
-</details>
-
+<div class="panel bep-panel"><div class="panel-head"><div><h2>BEP & Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div><div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValueD">Rp0/kg</b></div><div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPriceD">—</b></div><div><span>Selisih per kg</span><b id="bepGapD">—</b></div></div><div id="bepCtaD" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div></div>
+<div class="panel cost-comp-panel"><div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div><div class="cost-comp-body"><div class="cost-chart-wrap"><canvas id="costChartD"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotalD">Rp0</b></div></div><div id="costLegendD" class="cost-legend"></div></div></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Insight & Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div><div id="insightListD" class="insight-list"></div></div>
+<div class="panel"><div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table></div>
+<div class="panel"><div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div><div class="report" id="reportD"></div></div>
+</div></div></details>
 </section>
-
-<section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form">
-<label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label>
-<label>Qty (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga bahan/kg (Rp)<input type=number name=price min=0 required></label>
-<label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label>
-<label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div>
-<button class="primary full">Tambah Stok Bahan</button></form></div>
-<div class="panel"><h2>Stok Bahan Baku</h2><table><thead><tr><th>Bahan</th><th>Stok</th><th>Harga/kg</th><th>Transport</th><th>Biaya lain</th><th>HPP masuk/kg</th><th>Nilai stok</th><th>Supplier</th><th>AKSI</th></tr></thead><tbody id="rawTable"></tbody></table></div></section>
-
-<section id="batch" class="page"><div class="panel"><h2>Buat Batch Produksi</h2><p class="hint">Biaya transportasi dan biaya lain-lain bahan baku otomatis ikut masuk ke HPP bahan yang dipakai.</p><form id="batchForm" class="form">
-<label>Tanggal<input type=date name=date required></label><label>Bahan baku<select name=rawId id="rawSelect" required></select></label><label>Nama produk jadi<input name=productName placeholder="Contoh: Kopra, Arang" required></label><label>Qty bahan dipakai (kg)<input type=number name=inputQty min=0 step=.01 required></label><label>Hasil produksi (kg)<input type=number name=outputQty min=0 step=.01 required></label>
-<label>Tenaga kerja (Rp)<input type=number name=labor min=0 value=0></label><label>Energi/bahan bakar (Rp)<input type=number name=energy min=0 value=0></label><label>Biaya produksi lain (Rp)<input type=number name=other min=0 value=0></label><label>Catatan<input name=note></label><button class="primary full">Simpan Batch Produksi</button></form></div>
-<div class="panel"><h2>Riwayat Batch</h2><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan Baku</th><th>Produk Jadi</th><th>Input</th><th>Output</th><th>Penyusutan</th><th>HPP Batch</th><th>HPP/kg</th><th>AKSI</th></tr></thead><tbody id="batchTable"></tbody></table></div></section>
-
+<section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label><label>Qty (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga bahan/kg (Rp)<input type=number name=price min=0 required></label><label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label><label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div><button class="primary full">Tambah Stok Bahan</button></form></div><div class="panel"><h2>Stok Bahan Baku</h2><table><thead><tr><th>Bahan</th><th>Stok</th><th>Harga/kg</th><th>Transport</th><th>Biaya lain</th><th>HPP masuk/kg</th><th>Nilai stok</th><th>Supplier</th><th>AKSI</th></tr></thead><tbody id="rawTable"></tbody></table></div></section>
+<section id="batch" class="page"><div class="panel"><h2>Buat Batch Produksi</h2><p class="hint">Biaya transportasi dan biaya lain-lain bahan baku otomatis ikut masuk ke HPP bahan yang dipakai.</p><form id="batchForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Bahan baku<select name=rawId id="rawSelect" required></select></label><label>Nama produk jadi<input name=productName placeholder="Contoh: Kopra, Arang" required></label><label>Qty bahan dipakai (kg)<input type=number name=inputQty min=0 step=.01 required></label><label>Hasil produksi (kg)<input type=number name=outputQty min=0 step=.01 required></label><label>Tenaga kerja (Rp)<input type=number name=labor min=0 value=0></label><label>Energi/bahan bakar (Rp)<input type=number name=energy min=0 value=0></label><label>Biaya produksi lain (Rp)<input type=number name=other min=0 value=0></label><label>Catatan<input name=note></label><button class="primary full">Simpan Batch Produksi</button></form></div><div class="panel"><h2>Riwayat Batch</h2><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan Baku</th><th>Produk Jadi</th><th>Input</th><th>Output</th><th>Penyusutan</th><th>HPP Batch</th><th>HPP/kg</th><th>AKSI</th></tr></thead><tbody id="batchTable"></tbody></table></div></section>
 <section id="finished" class="page"><div class="panel"><h2>Stok Barang Jadi</h2><div class="cards mini"><div><span>Stok</span><b id="fQty">0 kg</b></div><div><span>Nilai HPP</span><b id="fValue">Rp0</b></div><div><span>Rata-rata HPP/kg</span><b id="fAvg">Rp0</b></div></div><table><thead><tr><th>Batch</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedTable"></tbody></table></div></section>
-
 <section id="sales" class="page"><div class="panel"><h2>Penjualan</h2><form id="salesForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Batch<select name=batchId id="salesBatch" required></select></label><label>Pelanggan<input name=customer required></label><label>Qty terjual (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga jual/kg (Rp)<input type=number name=price min=0 required></label><label>Status<select name=status><option>Lunas</option><option>Piutang</option></select></label><button class="primary full">Simpan Penjualan</button></form></div><div class="panel"><h2>Riwayat Penjualan</h2><table><thead><tr><th>Tanggal</th><th>Batch</th><th>Pelanggan</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Laba</th><th>AKSI</th></tr></thead><tbody id="salesTable"></tbody></table></div></section>
-
 <section id="expenses" class="page"><div class="panel"><h2>Pengeluaran Umum</h2><form id="expenseForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Kategori<select name=cat><option>Transportasi</option><option>Administrasi</option><option>Packaging</option><option>Maintenance</option><option>Lainnya</option></select></label><label>Deskripsi<input name=desc required></label><label>Jumlah (Rp)<input type=number name=amount min=0 required></label><button class="primary full">Simpan Pengeluaran</button></form></div><div class="panel"><h2>Riwayat Pengeluaran</h2><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Jumlah</th><th>AKSI</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
-
-<section id="debts" class="page"><div class="panel"><h2>Input Hutang Perusahaan</h2><p class="hint">Catat pinjaman/hutang dari bank, supplier, atau pihak lain. Bisa dibayar cicilan bertahap.</p><form id="debtForm" class="form">
-<label>Tanggal<input type=date name=date required></label><label>Kreditur / Pemberi Pinjaman<input name=creditor placeholder="Contoh: Bank BRI, Supplier X" required></label>
-<label>Keterangan<input name=desc placeholder="Contoh: Modal kerja, pembelian mesin"></label><label>Jumlah Hutang (Rp)<input type=number name=amount min=0 required></label>
-<label>Jatuh Tempo<input type=date name=dueDate></label>
-<button class="primary full">Simpan Hutang</button></form></div>
-<div class="panel"><h2>Riwayat Hutang</h2><table><thead><tr><th>Tanggal</th><th>Kreditur</th><th>Keterangan</th><th>Jumlah</th><th>Terbayar</th><th>Sisa</th><th>Jatuh Tempo</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="debtTable"></tbody></table></div></section>
-
-<section id="reports" class="page">
-
-<div class="panel">
-<div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div>
-<div class="stats prod-overview">
-<span>Total Batch<b id="psBatches">0</b></span>
-<span>Total Bahan Masuk<b id="psInput">0 kg</b></span>
-<span>Total Barang Jadi<b id="psOutput">0 kg</b></span>
-<span>Total Susut<b id="psLoss">0 kg</b></span>
-<span>Rata-rata Susut<b id="psLossPct">0%</b></span>
-<span>Total HPP Produksi<b id="psHpp">Rp0</b></span>
-<span>Total Hari Produksi<b id="psDays">0 hari</b></span>
-</div>
-<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
-<div class="bi-controls"><label>Target Margin (%)<input type="number" id="biMarginTarget" min="0" max="200" value="20" step="1"></label><p class="hint">BEP = harga jual impas (margin 0%). Harga Rekomendasi = HPP/kg × (1 + target margin).</p></div>
-<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTable"></tbody></table>
-</div>
-
-<div class="bi-grid-2">
-<div class="panel bep-panel">
-<div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div>
-<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValue">Rp0/kg</b></div>
-<div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPrice">—</b></div><div><span>Selisih per kg</span><b id="bepGap">—</b></div></div>
-<div id="bepCta" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
-</div>
-
-<div class="panel cost-comp-panel">
-<div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div>
-<div class="cost-comp-body">
-<div class="cost-chart-wrap"><canvas id="costChart"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotal">Rp0</b></div></div>
-<div id="costLegend" class="cost-legend"></div>
-</div>
-</div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Bahan evaluasi performa tiap batch produksi — laba/rugi dihitung dari yang sudah terjual</small></div></div>
-<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTable"></tbody></table>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
-<div class="report" id="report"></div>
-<button class="ghost" id="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup JSON</button> <button class="danger admin-only" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Hapus Semua Data</button>
-</div>
-
-</section>
+<section id="debts" class="page"><div class="panel"><h2>Input Hutang Perusahaan</h2><p class="hint">Catat pinjaman/hutang dari bank, supplier, atau pihak lain. Bisa dibayar cicilan bertahap.</p><form id="debtForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Kreditur / Pemberi Pinjaman<input name=creditor placeholder="Contoh: Bank BRI, Supplier X" required></label><label>Keterangan<input name=desc placeholder="Contoh: Modal kerja, pembelian mesin"></label><label>Jumlah Hutang (Rp)<input type=number name=amount min=0 required></label><label>Jatuh Tempo<input type=date name=dueDate></label><button class="primary full">Simpan Hutang</button></form></div><div class="panel"><h2>Riwayat Hutang</h2><table><thead><tr><th>Tanggal</th><th>Kreditur</th><th>Keterangan</th><th>Jumlah</th><th>Terbayar</th><th>Sisa</th><th>Jatuh Tempo</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="debtTable"></tbody></table></div></section>
+<section id="reports" class="page"><div class="panel"><div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div><div class="stats prod-overview"><span>Total Batch<b id="psBatches">0</b></span><span>Total Bahan Masuk<b id="psInput">0 kg</b></span><span>Total Barang Jadi<b id="psOutput">0 kg</b></span><span>Total Susut<b id="psLoss">0 kg</b></span><span>Rata-rata Susut<b id="psLossPct">0%</b></span><span>Total HPP Produksi<b id="psHpp">Rp0</b></span><span>Total Hari Produksi<b id="psDays">0 hari</b></span></div><table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table></div><div class="panel"><div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div><div class="bi-controls"><label>Target Margin (%)<input type="number" id="biMarginTarget" min="0" max="200" value="20" step="1"></label><p class="hint">BEP = harga jual impas (margin 0%). Harga Rekomendasi = HPP/kg × (1 + target margin).</p></div><table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTable"></tbody></table></div><div class="bi-grid-2"><div class="panel bep-panel"><div class="panel-head"><div><h2>BEP & Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div><div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValue">Rp0/kg</b></div><div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPrice">—</b></div><div><span>Selisih per kg</span><b id="bepGap">—</b></div></div><div id="bepCta" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div></div><div class="panel cost-comp-panel"><div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div><div class="cost-comp-body"><div class="cost-chart-wrap"><canvas id="costChart"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotal">Rp0</b></div></div><div id="costLegend" class="cost-legend"></div></div></div></div><div class="panel"><div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Bahan evaluasi performa tiap batch produksi — laba/rugi dihitung dari yang sudah terjual</small></div></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTable"></tbody></table></div><div class="panel"><div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div><div class="report" id="report"></div><button class="ghost" id="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup JSON</button> <button class="danger admin-only" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Hapus Semua Data</button></div></section>
 </main></div>
 <div id="modal" class="modal"><div class="modalbox"><h2>Catat Data</h2><button data-go="raw">Bahan Baku</button><button data-go="batch">Produksi Batch</button><button data-go="sales">Penjualan</button><button data-go="expenses">Pengeluaran</button><button data-go="debts">Hutang</button></div></div>
-<div id="loginModal" class="modal"><div class="modalbox"><h2>Login Admin</h2><form id="loginForm" class="form">
-<label class="full">Email<input type=email name=email required autocomplete=username></label>
-<label class="full">Password<input type=password name=password required autocomplete=current-password></label>
-<button class="primary full">Masuk</button></form>
-<p class="login-error" id="loginError"></p>
-<button class="ghost full" id="loginCancel">Batal</button></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="app.js"></script></body></html>
+<div id="loginModal" class="modal"><div class="modalbox"><h2>Login Admin</h2><form id="loginForm" class="form"><label class="full">Email<input type=email name=email required autocomplete=username></label><label class="full">Password<input type=password name=password required autocomplete=current-password></label><button class="primary full">Masuk</button></form><p class="login-error" id="loginError"></p><button class="ghost full" id="loginCancel">Batal</button></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/chart.js"></script><script src="app.js"></script></body></html>
