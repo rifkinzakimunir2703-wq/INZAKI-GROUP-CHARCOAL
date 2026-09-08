@@ -13,41 +13,6 @@
 <main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
 <section id="dashboard" class="page active">
 
-<!-- V10.5 — Executive Dashboard -->
-<div class="executive-dashboard">
-  <div class="exec-head">
-    <div><span class="eyebrow">EXECUTIVE OVERVIEW</span><h2>Dashboard Utama</h2><p>Ringkasan bisnis, analitik, insight, perhatian dan transaksi dalam satu tampilan.</p></div>
-    <div class="period-controls executive-period"><b>Periode</b><select id="dashboardPeriod"><option value="today">Hari ini</option><option value="7d">7 Hari</option><option value="30d">30 Hari</option><option value="month" selected>Bulan ini</option><option value="prevmonth">Bulan lalu</option><option value="year">Tahun ini</option><option value="all">Semua Data</option><option value="custom">Custom</option></select><input id="periodStart" type="date" style="display:none"><span id="periodTo" style="display:none">s/d</span><input id="periodEnd" type="date" style="display:none"><button id="periodApply" class="primary" style="display:none">Terapkan</button></div>
-  </div>
-  <div class="period-caption"><span id="periodLabel">Bulan ini</span><span id="periodLabelInline">PERIODE TERPILIH</span></div>
-  <div id="dashboardKpis" class="exec-kpis"></div>
-  <div class="exec-grid-main">
-    <div class="panel exec-panel"><div class="panel-head"><div><h2>Analitik Bisnis</h2><small>HPP, harga jual, margin dan performa pelanggan</small></div></div><div id="dashboardAnalytics" class="dashboard-analytics"></div></div>
-    <div class="panel exec-panel"><div class="panel-head"><div><h2>Smart Insight</h2><small>Keputusan yang paling penting berdasarkan periode</small></div></div><div id="dashboardSmartInsight" class="smart-insights"></div></div>
-  </div>
-  <div class="exec-grid-two">
-    <div class="panel exec-panel"><div class="panel-head"><div><h2>Perlu Diperhatikan</h2><small>Stok, piutang, hutang dan produksi yang membutuhkan tindakan</small></div></div><div id="dashboardAttention" class="attention-list"></div></div>
-    <div class="panel exec-panel"><div class="panel-head"><div><h2>Transaksi Terbaru</h2><small>Aktivitas penjualan terbaru pada periode terpilih</small></div></div><div id="dashboardRecentTransactions" class="recent-transactions"></div></div>
-  </div>
-  <div class="exec-grid-two">
-    <div class="panel chart-panel exec-panel"><div class="panel-head"><div><h2>Tren Produksi & Rendemen</h2><small>Performa produksi 6 bulan terakhir</small></div></div><canvas id="dashboardProductionChart"></canvas></div>
-    <div class="panel exec-panel"><div class="panel-head"><div><h2>Arus Kas & Profitabilitas</h2><small>Penjualan lunas, pengeluaran, laba dan piutang</small></div></div><div id="dashboardCashflow" class="dashboard-cashflow"></div></div>
-  </div>
-</div>
-
-<div class="section-block full-stats-section">
-<div class="section-label">FULL STATISTIK — <span id="periodLabelInline">PERIODE TERPILIH</span></div>
-<div class="full-stats-grid" id="fullStatsGrid"></div>
-<div class="full-stats-two">
-  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Penjualan</h2><small>Omzet, transaksi, volume, harga jual dan status pembayaran</small></div></div><div id="fullSalesStats" class="stat-table-wrap"></div></div>
-  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Keuangan</h2><small>Arus uang, HPP, biaya, laba, margin dan kewajiban</small></div></div><div id="fullFinanceStats" class="stat-table-wrap"></div></div>
-</div>
-<div class="full-stats-two">
-  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Produksi</h2><small>Total batch, input, output, susut, rendemen dan HPP</small></div></div><div id="fullProductionStats" class="stat-table-wrap"></div></div>
-  <div class="panel compact-stat-panel"><div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Posisi bahan baku dan barang jadi saat ini</small></div></div><div id="fullStockStats" class="stat-table-wrap"></div></div>
-</div>
-</div>
-
 <div class="section-block">
 <div class="section-label">Bahan Baku &amp; Barang Jadi</div>
 <div class="panel stock-panel">
@@ -90,7 +55,7 @@
 
 <div class="section-divider"><span>Keuangan</span></div>
 
-<details class="finance-toggle" id="financeSection" open>
+<details class="finance-toggle" id="financeSection">
 <summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
 <div class="finance-body">
 
