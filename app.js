@@ -652,6 +652,144 @@ $('#loginForm').onsubmit=async e=>{
 };
 $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')};
 
+/* ================= INZAKI GROUP V10 UPGRADE ================= */
+(function(){
+  const v10Nav = `
+  <button data-page="v10ops"><span class="nav-ic">📊</span><span class="nav-lb">Overview V10</span></button>
+  <button data-page="v10inventory"><span class="nav-ic">📦</span><span class="nav-lb">Inventory</span></button>
+  <button data-page="v10analytics"><span class="nav-ic">◔</span><span class="nav-lb">Analitik</span></button>
+  <button data-page="v10alerts"><span class="nav-ic">🔔</span><span class="nav-lb">Notifikasi</span></button>`;
+
+  const v10Sections = `
+<section id="v10ops" class="page">
+  <div class="v10-hero">
+    <div><span class="eyebrow">INZAKI GROUP · V10 CONTROL CENTER</span><h2>Operasional bisnis dalam satu layar</h2><p>Monitor bahan baku → produksi → stok → penjualan → cash flow secara cepat.</p></div>
+    <div class="v10-hero-actions"><button class="primary" data-v10-go="batch">+ Produksi</button><button class="ghost" data-v10-go="sales">+ Penjualan</button></div>
+  </div>
+  <div id="v10Kpis" class="v10-kpis"></div>
+  <div class="v10-grid-main">
+    <div class="panel"><div class="panel-head"><div><h2>Performa Produksi & Rendemen</h2><small>6 periode terakhir</small></div></div><canvas id="v10ProductionChart"></canvas></div>
+    <div class="panel"><div class="panel-head"><div><h2>Smart Insight</h2><small>Prioritas yang perlu diperhatikan</small></div></div><div id="v10Insights"></div></div>
+  </div>
+  <div class="v10-grid-3">
+    <div class="panel"><div class="panel-head"><div><h2>Quick Action</h2><small>Akses input utama</small></div></div><div class="quick-grid"><button data-v10-go="raw">＋ Bahan Baku</button><button data-v10-go="batch">🏭 Produksi</button><button data-v10-go="sales">💰 Penjualan</button><button data-v10-go="expenses">💸 Pengeluaran</button><button data-v10-go="debts">🏦 Hutang</button><button data-v10-go="reports">📑 Laporan</button></div></div>
+    <div class="panel"><div class="panel-head"><div><h2>Stok Kritis</h2><small>Perlu perhatian</small></div></div><div id="v10CriticalStock"></div></div>
+    <div class="panel"><div class="panel-head"><div><h2>Transaksi Terbaru</h2><small>Penjualan terakhir</small></div></div><div id="v10RecentSales"></div></div>
+  </div>
+</section>
+
+<section id="v10inventory" class="page">
+  <div class="page-intro"><div><span class="eyebrow">INVENTORY CONTROL</span><h2>Persediaan</h2><p>Nilai stok, mutasi sederhana, dan peringatan stok minimum.</p></div><button class="primary" data-v10-go="raw">+ Tambah Bahan</button></div>
+  <div id="v10InvKpis" class="v10-kpis"></div>
+  <div class="panel"><div class="panel-head"><div><h2>Ringkasan Persediaan</h2><small>Bahan baku dan barang jadi</small></div><input id="v10InvSearch" class="v10-search" placeholder="Cari bahan / produk…"></div><div id="v10InventoryTable"></div></div>
+</section>
+
+<section id="v10analytics" class="page">
+  <div class="page-intro"><div><span class="eyebrow">BUSINESS INTELLIGENCE</span><h2>Analitik V10</h2><p>Ukuran kinerja utama untuk membantu mengambil keputusan.</p></div><button class="ghost" id="v10ExportCsv">Export CSV</button></div>
+  <div id="v10AnalyticsCards" class="v10-kpis"></div>
+  <div class="v10-grid-main"><div class="panel"><div class="panel-head"><div><h2>HPP vs Harga Jual</h2><small>Per lini produksi</small></div></div><div id="v10LineAnalytics"></div></div><div class="panel"><div class="panel-head"><div><h2>Customer & Penjualan</h2><small>Ringkasan pelanggan</small></div></div><div id="v10CustomerAnalytics"></div></div></div>
+  <div class="panel"><div class="panel-head"><div><h2>Arus Kas Sederhana</h2><small>Penjualan lunas vs pengeluaran</small></div></div><div id="v10CashFlow"></div></div>
+</section>
+
+<section id="v10alerts" class="page">
+  <div class="page-intro"><div><span class="eyebrow">NOTIFICATION CENTER</span><h2>Notifikasi & Peringatan</h2><p>Semua hal yang membutuhkan perhatian Owner/Admin.</p></div><button class="ghost" id="v10RefreshAlerts">Refresh</button></div>
+  <div id="v10AlertSummary" class="v10-alert-summary"></div><div id="v10AlertList" class="v10-alert-list"></div>
+</section>`;
+
+  function injectUI(){
+    const nav=document.querySelector('aside nav');
+    if(nav && !document.querySelector('[data-page="v10ops"]')) nav.insertAdjacentHTML('beforeend',v10Nav);
+    const main=document.querySelector('main');
+    if(main && !document.getElementById('v10ops')) main.insertAdjacentHTML('beforeend',v10Sections);
+  }
+
+  function safe(n){return +n||0}
+  function soldV10(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+safe(x.qty),0)}
+  function money(n){return rp(n)}
+  function pct(n){return safe(n).toFixed(1)+'%'}
+  function sum(a,f){return a.reduce((x,y)=>x+safe(f(y)),0)}
+  function escV(x){return esc(x)}
+  function daysAgo(n){const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-n);return d}
+  function dateObj(s){return s?new Date(s+'T00:00:00'):new Date(0)}
+  function within30(s){return dateObj(s)>=daysAgo(29)}
+
+  function buildAlerts(){
+    const alerts=[];
+    const rawBy={};
+    S.raw.forEach(r=>{const k=(r.name||'').trim().toLowerCase();if(!rawBy[k])rawBy[k]={name:r.name,qty:0};rawBy[k].qty+=safe(r.qty)});
+    Object.values(rawBy).forEach(r=>{if(r.qty<=25)alerts.push({type:'danger',title:'Stok bahan baku rendah',body:`${r.name} tersisa ${kg(r.qty)}.`,go:'raw'})});
+    const finBy={};
+    S.batches.forEach(b=>{const q=Math.max(0,safe(b.output)-soldV10(b.id));const k=(b.productName||'').trim().toLowerCase();if(!finBy[k])finBy[k]={name:b.productName,qty:0};finBy[k].qty+=q});
+    Object.values(finBy).forEach(r=>{if(r.qty<=20)alerts.push({type:'warn',title:'Stok produk jadi rendah',body:`${r.name} tersisa ${kg(r.qty)}.`,go:'finished'})});
+    S.batches.slice().reverse().forEach(b=>{const y=b.input?safe(b.output)/safe(b.input)*100:0;if(y<27)alerts.push({type:'warn',title:'Rendemen di bawah target',body:`${b.code} hanya ${pct(y)} (target 27%).`,go:'batch'})});
+    S.debts.forEach(d=>{const r=debtRemaining(d);if(r>0&&d.dueDate&&dateObj(d.dueDate)<=daysAgo(-3))alerts.push({type:'danger',title:'Hutang mendekati jatuh tempo',body:`${d.creditor} · sisa ${money(r)} · ${fmtDate(d.dueDate)}`,go:'debts'})});
+    S.batches.forEach(b=>{const ss=S.sales.filter(x=>x.batchId==b.id),q=sum(ss,x=>x.qty),rev=sum(ss,x=>x.total),margin=rev-q*safe(b.hppkg);if(q>0&&margin<0)alerts.push({type:'danger',title:'Margin negatif',body:`${b.code}: ${money(margin)} dari penjualan yang sudah terjadi.`,go:'reports'})});
+    return alerts.slice(0,30)
+  }
+
+  function renderV10(){
+    if(!document.getElementById('v10ops'))return;
+    const out=S.batches.reduce((a,b)=>a+safe(b.output),0), inp=S.batches.reduce((a,b)=>a+safe(b.input),0), soldQty=sum(S.sales,x=>x.qty), revenue=sum(S.sales,x=>x.total), cogs=sum(S.sales,x=>{const b=B(x.batchId);return b?safe(x.qty)*safe(b.hppkg):0}), expenses=sum(S.expenses,x=>x.amount), debt=sum(S.debts,x=>debtRemaining(x));
+    const profit=revenue-cogs-expenses, finished=Math.max(0,out-soldQty), rawQty=sum(S.raw,x=>x.qty), yield=inp?out/inp*100:0;
+    const kpis=[['Penjualan',money(revenue),'Omzet seluruh transaksi','good'],['Laba Bersih',money(profit),'Omzet − HPP terjual − pengeluaran',profit>=0?'good':'bad'],['Stok Produk',kg(finished),'Produk jadi yang belum terjual','info'],['Rendemen',pct(yield),'Output ÷ bahan masuk',yield>=27?'good':'warn'],['Hutang',money(debt),'Sisa kewajiban','warn'],['Bahan Baku',kg(rawQty),'Stok bahan tersisa','info']];
+    $('#v10Kpis').innerHTML=kpis.map(k=>`<div class="v10-kpi ${k[3]}"><span>${k[0]}</span><b>${k[1]}</b><small>${k[2]}</small></div>`).join('');
+    $('#v10InvKpis').innerHTML=[['Bahan Baku',kg(rawQty)],['Barang Jadi',kg(finished)],['Nilai Produk Jadi',money(S.batches.reduce((a,b)=>a+Math.max(0,b.output-soldV10(b.id))*b.hppkg,0))],['Total Jenis',new Set([...S.raw.map(x=>(x.name||'').toLowerCase()),...S.batches.map(x=>(x.productName||'').toLowerCase())]).size+' jenis']].map(k=>`<div class="v10-kpi info"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('');
+    const alerts=buildAlerts();
+    $('#v10Insights').innerHTML=alerts.slice(0,5).map(a=>`<div class="v10-insight ${a.type}"><span>${a.type==='danger'?'!':'↗'}</span><div><b>${escV(a.title)}</b><p>${escV(a.body)}</p></div></div>`).join('')||'<div class="v10-empty">Tidak ada peringatan. Operasional terlihat aman.</div>';
+    const critical=alerts.filter(a=>a.type==='danger').slice(0,5);
+    $('#v10CriticalStock').innerHTML=critical.map(a=>`<button class="v10-alert-row ${a.type}" data-v10-go="${a.go}"><span>${a.title}</span><small>${a.body}</small></button>`).join('')||'<div class="v10-empty">Tidak ada stok/keuangan kritis.</div>';
+    $('#v10RecentSales').innerHTML=S.sales.slice().sort((a,b)=>dateObj(b.date)-dateObj(a.date)).slice(0,5).map(x=>{const b=B(x.batchId);return `<div class="v10-list-row"><div><b>${escV(x.customer||'Umum')}</b><small>${fmtDate(x.date)} · ${b?escV(b.code):'-'}</small></div><strong>${money(x.total)}</strong></div>`}).join('')||'<div class="v10-empty">Belum ada transaksi.</div>';
+    const invSearch=($('#v10InvSearch')?.value||'').toLowerCase();
+    const rows=[];
+    S.raw.forEach(r=>{if(invSearch&&!(`${r.name}`.toLowerCase().includes(invSearch)))return;rows.push({type:'Bahan Baku',name:r.name,qty:r.qty,value:r.qty*landed(r),status:r.qty<=25?'Kritis':'Aman',go:'raw'})});
+    const productMap={};S.batches.forEach(b=>{const q=Math.max(0,b.output-soldV10(b.id));const k=(b.productName||'').trim().toLowerCase();if(!productMap[k])productMap[k]={name:b.productName,qty:0,value:0};productMap[k].qty+=q;productMap[k].value+=q*b.hppkg});
+    Object.values(productMap).forEach(r=>{if(invSearch&&!r.name.toLowerCase().includes(invSearch))return;rows.push({type:'Barang Jadi',name:r.name,qty:r.qty,value:r.value,status:r.qty<=20?'Kritis':'Aman',go:'finished'})});
+    $('#v10InventoryTable').innerHTML=`<div class="v10-table-wrap"><table><thead><tr><th>Jenis</th><th>Nama</th><th>Qty</th><th>Nilai</th><th>Status</th><th>Aksi</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.type}</td><td><b>${escV(r.name)}</b></td><td>${kg(r.qty)}</td><td>${money(r.value)}</td><td><span class="badge ${r.status==='Kritis'?'badge-overdue':'badge-ok'}">${r.status}</span></td><td><button class="ghost small" data-v10-go="${r.go}">Buka</button></td></tr>`).join('')||empty(6)}</tbody></table></div>`;
+    const line={};S.batches.forEach(b=>{const k=`${b.rawName||'?'} → ${b.productName||'?'}`;if(!line[k])line[k]={name:k,input:0,output:0,hpp:0,sales:0,qty:0};line[k].input+=safe(b.input);line[k].output+=safe(b.output);line[k].hpp+=safe(b.totalHpp);const ss=S.sales.filter(x=>x.batchId==b.id);line[k].sales+=sum(ss,x=>x.total);line[k].qty+=sum(ss,x=>x.qty)});
+    $('#v10LineAnalytics').innerHTML=Object.values(line).map(x=>{const h=x.output?x.hpp/x.output:0,p=x.qty?x.sales/x.qty:0,m=p-h;return `<div class="v10-line"><div><b>${escV(x.name)}</b><small>Rendemen ${pct(x.input?x.output/x.input*100:0)}</small></div><div><span>HPP/kg</span><b>${money(h)}</b></div><div><span>Harga jual/kg</span><b>${money(p)}</b></div><div><span>Margin/kg</span><b class="${m<0?'neg':'pos'}">${money(m)}</b></div></div>`}).join('')||'<div class="v10-empty">Belum ada batch produksi.</div>';
+    const cust={};S.sales.forEach(x=>{const k=x.customer||'Umum';if(!cust[k])cust[k]={name:k,qty:0,total:0,count:0};cust[k].qty+=safe(x.qty);cust[k].total+=safe(x.total);cust[k].count++});
+    $('#v10CustomerAnalytics').innerHTML=Object.values(cust).sort((a,b)=>b.total-a.total).slice(0,8).map(c=>`<div class="v10-list-row"><div><b>${escV(c.name)}</b><small>${c.count} transaksi · ${kg(c.qty)}</small></div><strong>${money(c.total)}</strong></div>`).join('')||'<div class="v10-empty">Belum ada pelanggan.</div>';
+    const paidRevenue=sum(S.sales.filter(x=>x.status==='Lunas'),x=>x.total), receivable=sum(S.sales.filter(x=>x.status!=='Lunas'),x=>x.total);
+    $('#v10AnalyticsCards').innerHTML=[['Omzet Lunas',money(paidRevenue)],['Piutang Penjualan',money(receivable)],['HPP Terjual',money(cogs)],['Pengeluaran',money(expenses)],['Laba Bersih',money(profit)],['Margin Bersih',revenue?(profit/revenue*100).toFixed(1)+'%':'0%']].map(k=>`<div class="v10-kpi ${k[0].includes('Laba')&&profit<0?'bad':'info'}"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('');
+    $('#v10CashFlow').innerHTML=`<div class="cashflow"><div><span>Uang masuk dari penjualan lunas</span><b class="pos">${money(paidRevenue)}</b></div><div><span>Uang keluar pengeluaran umum</span><b class="neg">${money(expenses)}</b></div><div><span>Arus kas operasional sederhana</span><b class="${paidRevenue-expenses<0?'neg':'pos'}">${money(paidRevenue-expenses)}</b></div></div>`;
+    $('#v10AlertSummary').innerHTML=`<div><b>${alerts.length}</b><span>Total peringatan</span></div><div><b>${alerts.filter(x=>x.type==='danger').length}</b><span>Kritis</span></div><div><b>${alerts.filter(x=>x.type==='warn').length}</b><span>Perhatian</span></div>`;
+    $('#v10AlertList').innerHTML=alerts.map(a=>`<div class="v10-alert-card ${a.type}"><div class="alert-icon">${a.type==='danger'?'!':'⚠'}</div><div><b>${escV(a.title)}</b><p>${escV(a.body)}</p><button class="ghost small" data-v10-go="${a.go}">Buka terkait</button></div></div>`).join('')||'<div class="panel v10-empty">Tidak ada notifikasi.</div>';
+    drawV10ProductionChart();
+  }
+
+  function drawV10ProductionChart(){
+    const c=document.getElementById('v10ProductionChart');if(!c||!window.Chart)return;
+    if(window.__v10Chart)window.__v10Chart.destroy();
+    const months=[];const now=new Date();for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);months.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleDateString('id-ID',{month:'short'})})}
+    const prod=months.map(m=>S.batches.filter(b=>(b.date||'').slice(0,7)===m.key).reduce((a,b)=>a+b.output,0));
+    const yld=months.map(m=>{const bs=S.batches.filter(b=>(b.date||'').slice(0,7)===m.key),i=bs.reduce((a,b)=>a+b.input,0),o=bs.reduce((a,b)=>a+b.output,0);return i?o/i*100:0});
+    window.__v10Chart=new Chart(c,{type:'line',data:{labels:months.map(m=>m.label),datasets:[{label:'Produksi (kg)',data:prod,tension:.35,yAxisID:'y'},{label:'Rendemen (%)',data:yld,tension:.35,yAxisID:'y1'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9aa79d'}}},scales:{x:{ticks:{color:'#829087'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#829087'},grid:{color:'rgba(255,255,255,.05)'}},y1:{position:'right',ticks:{color:'#829087'},grid:{drawOnChartArea:false}}}}});
+  }
+
+  function exportCSV(){
+    const rows=[['Tanggal','Invoice','Pelanggan','Batch','Produk','Qty kg','Harga/kg','Total','Status']];
+    S.sales.forEach(x=>{const b=B(x.batchId);rows.push([x.date,x.invoice_no||'',x.customer||'Umum',b?.code||'',b?.productName||'',x.qty,x.price,x.total,x.status||''])});
+    const csv=rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='inzaki-penjualan-v10.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)
+  }
+
+  function patchNavigation(){
+    const oldGo=go;
+    window.go=function(p){oldGo(p);if(['v10ops','v10inventory','v10analytics','v10alerts'].includes(p)){$('#title').textContent={v10ops:'Overview V10',v10inventory:'Inventory Control',v10analytics:'Analitik V10',v10alerts:'Notifikasi & Peringatan'}[p];renderV10()}};
+    document.querySelectorAll('[data-v10-go]').forEach(el=>el.addEventListener('click',()=>window.go(el.dataset.v10Go)));
+    document.querySelectorAll('nav button[data-page]').forEach(el=>{if(!el.dataset.v10bound){el.dataset.v10bound='1';el.addEventListener('click',()=>{if(['v10ops','v10inventory','v10analytics','v10alerts'].includes(el.dataset.page)){window.go(el.dataset.page)}})}});
+    $('#v10InvSearch')?.addEventListener('input',renderV10);$('#v10RefreshAlerts')?.addEventListener('click',renderV10);$('#v10ExportCsv')?.addEventListener('click',exportCSV);
+  }
+
+  function patchRender(){
+    const base=render;
+    window.render=function(){base();renderV10()};
+  }
+
+  injectUI();patchNavigation();patchRender();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',renderV10);else setTimeout(renderV10,0);
+})();
+
+
 /* ---- Init ---- */
 (async function init(){
   try{
