@@ -10,123 +10,63 @@
 <button class="ghost small" id="logoutBtn" style="display:none">Logout</button>
 </div>
 </aside>
-<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1><div id="headerPeriod" class="header-period">Semua periode</div></div><div class="header-actions"><button class="ghost" id="printReport">Cetak Ringkasan</button><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
-
+<main><header><div><small>BUSINESS MANAGEMENT</small><h1 id="title">Dashboard Global</h1></div><button class="primary admin-only" id="quick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Catat</button></header>
 <section id="dashboard" class="page active">
 
-<div class="dashboard-toolbar panel">
-  <div class="period-control">
-    <div class="period-icon">▣</div>
-    <div><span>Periode Dashboard</span><b id="dashPeriodLabel">Semua periode</b></div>
-  </div>
-  <div class="period-fields">
-    <label>Dari<input type="date" id="dashStart"></label>
-    <span class="period-sep">→</span>
-    <label>Sampai<input type="date" id="dashEnd"></label>
-    <button class="ghost period-preset" data-range="month">Bulan ini</button>
-    <button class="ghost period-preset" data-range="7d">7 hari</button>
-    <button class="ghost period-preset" data-range="all">Semua</button>
-  </div>
+<div class="section-block">
+<div class="section-label">Bahan Baku &amp; Barang Jadi</div>
+<div class="panel stock-panel">
+<div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Bahan baku dan barang jadi ditampilkan terpisah per jenis</small></div></div>
+<div id="stockCards" class="stock-cards"></div>
+</div>
 </div>
 
-<div class="dashboard-hero">
-  <div>
-    <small>BUSINESS PERFORMANCE</small>
-    <h2>Dashboard Global</h2>
-    <p>Pantau bahan baku, produksi, stok, penjualan, HPP dan profit dalam satu layar.</p>
-  </div>
-  <div class="hero-note">“Data yang tepat,<br><b>keputusan yang lebih baik.</b>”</div>
-</div>
-
-<div class="cards kpi-grid">
-  <div class="kpi-card kpi-green"><span>Total Bahan Masuk</span><b id="kpiRaw">0 kg</b><small id="kpiRawTrend">Periode terpilih</small></div>
-  <div class="kpi-card kpi-teal"><span>Total Produksi</span><b id="kpiOutput">0 kg</b><small id="kpiOutputTrend">Barang jadi</small></div>
-  <div class="kpi-card kpi-amber"><span>Rendemen Rata-rata</span><b id="kpiYield">0%</b><small id="kpiYieldTrend">Target ≥ 27%</small></div>
-  <div class="kpi-card kpi-violet"><span>Total HPP</span><b id="kpiHpp">Rp0</b><small id="kpiHppTrend">Biaya produksi</small></div>
-  <div class="kpi-card kpi-blue"><span>Total Penjualan</span><b id="kpiSales">Rp0</b><small id="kpiSalesTrend">Omzet</small></div>
-  <div class="kpi-card kpi-red"><span>Total Kerugian</span><b id="kpiLoss">Rp0</b><small id="kpiLossTrend">Batch / transaksi negatif</small></div>
-</div>
-
-<div class="mockup-grid mockup-top">
-  <div class="panel chart-panel mock-chart">
-    <div class="panel-head"><div><h2>Perbandingan Produksi &amp; Rendemen</h2><small>Bahan masuk, hasil produksi dan rendemen per batch</small></div></div>
-    <canvas id="productionChart"></canvas>
-  </div>
-  <div class="panel chart-panel mock-chart">
-    <div class="panel-head"><div><h2>Biaya per Kg &amp; Margin</h2><small>HPP, harga jual dan margin per batch</small></div></div>
-    <canvas id="marginChart"></canvas>
-  </div>
-  <div class="panel cost-comp-panel mock-cost">
-    <div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi komponen biaya terhadap HPP</small></div></div>
-    <div class="cost-comp-body">
-      <div class="cost-chart-wrap"><canvas id="costChart"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotal">Rp0</b></div></div>
-      <div id="costLegend" class="cost-legend"></div>
-    </div>
-  </div>
-</div>
-
-<div class="mockup-grid mockup-detail">
-  <div class="panel batch-detail-panel">
-    <div class="panel-head"><div><h2>Detail Batch Produksi</h2><small>Performa output, susut, rendemen, HPP dan status profit</small></div></div>
-    <div id="batchDetailList" class="batch-detail-list"></div>
-  </div>
-  <div class="panel insight-panel">
-    <div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Analisis otomatis berdasarkan data periode</small></div></div>
-    <div id="insightList"></div>
-  </div>
-</div>
-
-<div class="panel bi-sim-panel">
-  <div class="panel-head"><div><h2>Simulasi Peningkatan Rendemen</h2><small>Jika rendemen naik, berapa dampaknya terhadap output, HPP/kg dan laba?</small></div></div>
-  <div class="bi-sim-controls">
-    <label>Pilih Batch<select id="biSimBatch"></select></label>
-    <label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
-    <label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
-  </div>
-  <div id="biSimResult" class="bi-sim-result"></div>
-</div>
-
-<div class="mockup-grid bottom-grid">
-  <div class="panel">
-    <div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Harga jual minimal agar tidak rugi</small></div></div>
-    <div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValue">Rp0/kg</b></div>
-    <div class="bep-compare"><div><span>Harga Jual Saat Ini</span><b id="bepCurrentPrice">—</b></div><div><span>Selisih per kg</span><b id="bepGap">—</b></div></div>
-    <div id="bepCta" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
-  </div>
-  <div class="panel chart-panel">
-    <div class="panel-head"><div><h2>Grafik Tren Produksi &amp; Keuntungan</h2><small>Output produksi, HPP/kg dan rugi per batch</small></div></div>
-    <canvas id="trendChart"></canvas>
-  </div>
-</div>
-
-<div class="panel">
-  <div class="panel-head"><div><h2>Statistik Produksi per Lini</h2><small>Akumulasi performa setiap lini bahan → produk</small></div></div>
-  <div id="lineStatsCards" class="line-stats-grid"></div>
+<div class="section-block">
+<div class="section-label">Statistik Produksi per Lini</div>
+<div id="lineStatsCards" class="line-stats-grid"></div>
 </div>
 
 <div class="panel batch-loss-panel">
-  <div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan dan untung/rugi terbaru</small></div><div id="susutTotal" class="susut-total"></div></div>
-  <div id="batchLossList" class="batch-loss-list"></div>
+<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
+<div id="batchLossList" class="batch-loss-list"></div>
 </div>
 
 <div class="panel">
-  <div class="panel-head"><div><h2>Batch Terbaru</h2><small id="recentSub">5 batch produksi paling akhir</small></div></div>
-  <div id="recent"></div>
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
+<div id="insightList" class="insight-list"></div>
 </div>
 
-<div class="section-divider"><span>Keuangan &amp; Laporan</span></div>
+<div class="panel bi-sim-panel">
+<div class="panel-head"><div><h2>Simulasi Rendemen</h2><small>Lihat dampak kenaikan rendemen terhadap HPP/kg dan laba, per batch</small></div></div>
+<div class="bi-sim-controls">
+<label>Pilih Batch<select id="biSimBatch"></select></label>
+<label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
+<label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
+</div>
+<div id="biSimResult" class="bi-sim-result"></div>
+</div>
+
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
+<canvas id="productionChart"></canvas>
+</div>
+
+<div class="panel"><div class="panel-head"><div><h2>Batch Terbaru</h2><small id="recentSub">5 batch produksi paling akhir</small></div></div><div id="recent"></div></div>
+
+<div class="section-divider"><span>Keuangan</span></div>
 
 <details class="finance-toggle" id="financeSection">
-<summary><div><h2>Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang dan laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
+<summary><div><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 3l-4 4-4-4"/><path d="M17 13h.01"/></svg> Data Keuangan &amp; Laporan Lengkap</h2><small>Laba, pengeluaran, hutang &amp; laporan lengkap — ketuk untuk membuka</small></div><span class="finance-arrow">▾</span></summary>
 <div class="finance-body">
 
 <div id="financeLocked" class="finance-locked">
-<span class="lock-ic">🔒</span>
+<span class="lock-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M7 10V7a5 5 0 0110 0v3"/></svg></span>
 <p>Data keuangan bersifat rahasia dan hanya bisa dilihat setelah login sebagai admin.</p>
 <button class="ghost small" id="financeLoginBtn">Login Admin</button>
 </div>
 
 <div id="financeContent">
+
 <div class="cards global">
 <div><span>Laba Mingguan</span><b id="dProfitWeek">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
@@ -134,27 +74,67 @@
 <div><span>Pengeluaran Bulanan</span><b id="dExpenseMonth">Rp0</b></div>
 <div class="span-full"><span>Hutang Perusahaan (Sisa Belum Lunas)</span><b id="dDebtOutstanding">Rp0</b><small id="dDebtInfo">0 kreditur aktif</small><div id="dDebtBreakdown" class="breakdown"></div></div></div>
 
-<div class="panel chart-panel"><div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div><canvas id="financeChart"></canvas></div>
-
-<div class="panel"><div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div>
-<div class="stats prod-overview">
-<span>Total Batch<b id="psBatchesD">0</b></span><span>Total Bahan Masuk<b id="psInputD">0 kg</b></span><span>Total Barang Jadi<b id="psOutputD">0 kg</b></span><span>Total Susut<b id="psLossD">0 kg</b></span><span>Rata-rata Susut<b id="psLossPctD">0%</b></span><span>Total HPP Produksi<b id="psHppD">Rp0</b></span><span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div>
+<canvas id="financeChart"></canvas>
 </div>
-<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table></div>
 
-<div class="panel"><div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP, harga rekomendasi dan margin per lini produksi</small></div></div>
-<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table></div>
+<div class="panel">
+<div class="panel-head"><div><h2>Statistik Produksi Lengkap</h2><small>Seluruh lini produksi, akumulasi dari awal hingga saat ini</small></div></div>
+<div class="stats prod-overview">
+<span>Total Batch<b id="psBatchesD">0</b></span>
+<span>Total Bahan Masuk<b id="psInputD">0 kg</b></span>
+<span>Total Barang Jadi<b id="psOutputD">0 kg</b></span>
+<span>Total Susut<b id="psLossD">0 kg</b></span>
+<span>Rata-rata Susut<b id="psLossPctD">0%</b></span>
+<span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
+<span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
+</div>
+<table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
+</div>
 
-<div class="bi-grid-2"><div class="panel bep-panel"><div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg</small></div></div>
-<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValueD">Rp0/kg</b></div><div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPriceD">—</b></div><div><span>Selisih per kg</span><b id="bepGapD">—</b></div></div><div id="bepCtaD" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div></div>
-<div class="panel cost-comp-panel"><div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya</small></div></div><div class="cost-comp-body"><div class="cost-chart-wrap"><canvas id="costChartD"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotalD">Rp0</b></div></div><div id="costLegendD" class="cost-legend"></div></div></div></div>
+<div class="panel">
+<div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
+<table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table>
+</div>
 
-<div class="panel"><div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div><div id="insightListD" class="insight-list"></div></div>
-<div class="panel"><div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table></div>
-<div class="panel"><div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div><div class="report" id="reportD"></div></div>
-</div></div></details>
+<div class="bi-grid-2">
+<div class="panel bep-panel">
+<div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div>
+<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValueD">Rp0/kg</b></div>
+<div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPriceD">—</b></div><div><span>Selisih per kg</span><b id="bepGapD">—</b></div></div>
+<div id="bepCtaD" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
+</div>
+
+<div class="panel cost-comp-panel">
+<div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div>
+<div class="cost-comp-body">
+<div class="cost-chart-wrap"><canvas id="costChartD"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotalD">Rp0</b></div></div>
+<div id="costLegendD" class="cost-legend"></div>
+</div>
+</div>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
+<div id="insightListD" class="insight-list"></div>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div>
+<table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
+<div class="report" id="reportD"></div>
+</div>
+
+</div>
+</div>
+</details>
+
 </section>
-
 
 <section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form">
 <label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label>
@@ -229,7 +209,7 @@
 <div class="panel">
 <div class="panel-head"><div><h2>Laporan Keuangan</h2><small>Ringkasan omzet, HPP, pengeluaran dan laba bersih seluruh periode</small></div></div>
 <div class="report" id="report"></div>
-<button class="ghost" id="exportCsv">Export Penjualan CSV</button> <button class="ghost" id="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup JSON</button> <button class="danger admin-only" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Hapus Semua Data</button>
+<button class="ghost" id="backup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup JSON</button> <button class="danger admin-only" id="reset"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg> Hapus Semua Data</button>
 </div>
 
 </section>
