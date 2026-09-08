@@ -31,6 +31,21 @@
 <div id="batchLossList" class="batch-loss-list"></div>
 </div>
 
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
+<div id="insightList" class="insight-list"></div>
+</div>
+
+<div class="panel bi-sim-panel">
+<div class="panel-head"><div><h2>Simulasi Rendemen</h2><small>Lihat dampak kenaikan rendemen terhadap HPP/kg dan laba, per batch</small></div></div>
+<div class="bi-sim-controls">
+<label>Pilih Batch<select id="biSimBatch"></select></label>
+<label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
+<label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
+</div>
+<div id="biSimResult" class="bi-sim-result"></div>
+</div>
+
 <div class="panel chart-panel">
 <div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
 <canvas id="productionChart"></canvas>
@@ -184,21 +199,6 @@
 <div id="costLegend" class="cost-legend"></div>
 </div>
 </div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
-<div id="insightList" class="insight-list"></div>
-</div>
-
-<div class="panel bi-sim-panel">
-<div class="panel-head"><div><h2>Simulasi Rendemen</h2><small>Lihat dampak kenaikan rendemen terhadap HPP/kg dan laba, per batch</small></div></div>
-<div class="bi-sim-controls">
-<label>Pilih Batch<select id="biSimBatch"></select></label>
-<label>Kenaikan Rendemen <span id="biSimDeltaVal">+0%</span><input type="range" id="biSimDelta" min="0" max="15" step="0.5" value="0"></label>
-<label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
-</div>
-<div id="biSimResult" class="bi-sim-result"></div>
 </div>
 
 <div class="panel">
