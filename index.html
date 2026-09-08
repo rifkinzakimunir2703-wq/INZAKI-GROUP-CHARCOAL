@@ -83,6 +83,28 @@
 <table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTableD"></tbody></table>
 </div>
 
+<div class="bi-grid-2">
+<div class="panel bep-panel">
+<div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div>
+<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValueD">Rp0/kg</b></div>
+<div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPriceD">—</b></div><div><span>Selisih per kg</span><b id="bepGapD">—</b></div></div>
+<div id="bepCtaD" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
+</div>
+
+<div class="panel cost-comp-panel">
+<div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div>
+<div class="cost-comp-body">
+<div class="cost-chart-wrap"><canvas id="costChartD"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotalD">Rp0</b></div></div>
+<div id="costLegendD" class="cost-legend"></div>
+</div>
+</div>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
+<div id="insightListD" class="insight-list"></div>
+</div>
+
 <div class="panel">
 <div class="panel-head"><div><h2>Untung / Rugi per Batch</h2><small>Laba/rugi dihitung dari yang sudah terjual</small></div></div>
 <table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan → Produk</th><th>Output</th><th>Susut</th><th>Rendemen</th><th>HPP/kg</th><th>Terjual</th><th>Sisa Stok</th><th>Omzet</th><th>Untung/Rugi</th><th>Margin</th><th>Status</th></tr></thead><tbody id="profitTableD"></tbody></table>
@@ -145,6 +167,28 @@
 <div class="panel-head"><div><h2>Business Intelligence</h2><small>HPP, rendemen, BEP &amp; harga jual minimum per lini produksi</small></div></div>
 <div class="bi-controls"><label>Target Margin (%)<input type="number" id="biMarginTarget" min="0" max="200" value="20" step="1"></label><p class="hint">BEP = harga jual impas (margin 0%). Harga Rekomendasi = HPP/kg × (1 + target margin).</p></div>
 <table><thead><tr><th>Lini Produksi</th><th>Rendemen</th><th>HPP/kg</th><th>BEP (Harga Min)</th><th>Harga Rekomendasi</th><th>Harga Jual Rata²</th><th>Margin Aktual</th></tr></thead><tbody id="biTable"></tbody></table>
+</div>
+
+<div class="bi-grid-2">
+<div class="panel bep-panel">
+<div class="panel-head"><div><h2>BEP &amp; Harga Jual Minimum</h2><small>Agar tidak rugi, harga jual minimal per kg (rata² seluruh batch)</small></div></div>
+<div class="bep-hero"><span class="bep-hero-label">Titik Impas (BEP)</span><b id="bepValue">Rp0/kg</b></div>
+<div class="bep-compare"><div><span>Harga Jual Rata² Saat Ini</span><b id="bepCurrentPrice">—</b></div><div><span>Selisih per kg</span><b id="bepGap">—</b></div></div>
+<div id="bepCta" class="bep-cta" style="display:none">Naikkan harga jual atau tingkatkan rendemen</div>
+</div>
+
+<div class="panel cost-comp-panel">
+<div class="panel-head"><div><h2>Komposisi Biaya Produksi</h2><small>Kontribusi tiap komponen biaya terhadap total HPP</small></div></div>
+<div class="cost-comp-body">
+<div class="cost-chart-wrap"><canvas id="costChart"></canvas><div class="cost-chart-center"><span>Total Biaya</span><b id="costTotal">Rp0</b></div></div>
+<div id="costLegend" class="cost-legend"></div>
+</div>
+</div>
+</div>
+
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
+<div id="insightList" class="insight-list"></div>
 </div>
 
 <div class="panel bi-sim-panel">
