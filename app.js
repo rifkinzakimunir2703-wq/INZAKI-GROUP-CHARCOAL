@@ -128,7 +128,7 @@ async function initAuth(){
 }
 
 /* ---- Charts ---- */
-let financeChart=null,productionChart=null,costChart=null;
+let financeChart=null,productionChart=null;
 const PALETTE={ember:'#22C55E',gold:'#F5A524',red:'#F76E7E',green:'#22C55E',teal:'#2DD4CF',violet:'#A78BFA',ink:'#F1F4EF',muted:'#8E9A8B',grid:'rgba(255,255,255,.08)'};
 function drawCharts(){
  if(typeof Chart==='undefined')return;
@@ -163,13 +163,14 @@ function drawCharts(){
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}}}}});
 }
 
-/* ---- Chart komposisi biaya (donut) ---- */
-function drawCostChart(rows,total){
- let el=$('#costChart');if(!el||typeof Chart==='undefined')return;
- if(costChart)costChart.destroy();
+/* ---- Chart komposisi biaya (donut) — dipakai untuk 2 canvas (Laporan & Dashboard) ---- */
+let costCharts={};
+function drawCostChart(elId,rows,total){
+ let el=$('#'+elId);if(!el||typeof Chart==='undefined')return;
+ if(costCharts[elId]){costCharts[elId].destroy();delete costCharts[elId]}
  if(!total){el.style.display='none';return}
  el.style.display='';
- costChart=new Chart(el,{type:'doughnut',data:{labels:rows.map(r=>r.label),datasets:[{data:rows.map(r=>r.val),backgroundColor:rows.map(r=>r.color),borderColor:'#121614',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${rp(c.parsed)} (${(c.parsed/total*100).toFixed(1)}%)`}}}}});
+ costCharts[elId]=new Chart(el,{type:'doughnut',data:{labels:rows.map(r=>r.label),datasets:[{data:rows.map(r=>r.val),backgroundColor:rows.map(r=>r.color),borderColor:'#121614',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${rp(c.parsed)} (${(c.parsed/total*100).toFixed(1)}%)`}}}}});
 }
 
 /* ---- Insight & Rekomendasi otomatis (rule-based dari data yang ada) ---- */
@@ -269,6 +270,10 @@ if($('#bepValue'))$('#bepValue').textContent=rp(globalBep)+'/kg';
 if($('#bepCurrentPrice'))$('#bepCurrentPrice').textContent=totalSoldQtyAll?rp(globalAvgSell)+'/kg':'Belum ada penjualan';
 if($('#bepGap')){let g=$('#bepGap');g.textContent=totalSoldQtyAll?(sellGap<0?'-':'+')+rp(Math.abs(sellGap)):'—';g.className=sellGap<0?'neg':'pos'}
 if($('#bepCta'))$('#bepCta').style.display=(totalSoldQtyAll&&sellGap<0)?'block':'none';
+if($('#bepValueD'))$('#bepValueD').textContent=rp(globalBep)+'/kg';
+if($('#bepCurrentPriceD'))$('#bepCurrentPriceD').textContent=totalSoldQtyAll?rp(globalAvgSell)+'/kg':'Belum ada penjualan';
+if($('#bepGapD')){let g=$('#bepGapD');g.textContent=totalSoldQtyAll?(sellGap<0?'-':'+')+rp(Math.abs(sellGap)):'—';g.className=sellGap<0?'neg':'pos'}
+if($('#bepCtaD'))$('#bepCtaD').style.display=(totalSoldQtyAll&&sellGap<0)?'block':'none';
 /* ---- Komposisi Biaya Produksi ---- */
 let costComp={bahan:0,transport:0,tenaga:0,energi:0,lain:0};
 S.batches.forEach(b=>{
@@ -289,10 +294,16 @@ let costRows=[
  {label:'Biaya Lain-lain',val:costComp.lain,color:PALETTE.muted}
 ];
 if($('#costTotal'))$('#costTotal').textContent=rp(costTotal);
-if($('#costLegend'))$('#costLegend').innerHTML=costRows.map(r=>`<div class="cc-legend-row"><span class="cc-dot" style="background:${r.color}"></span><span class="cc-label">${r.label}</span><b>${costTotal?(r.val/costTotal*100).toFixed(1):'0.0'}%</b></div>`).join('');
-drawCostChart(costRows,costTotal);
+if($('#costTotalD'))$('#costTotalD').textContent=rp(costTotal);
+let costLegendHtml=costRows.map(r=>`<div class="cc-legend-row"><span class="cc-dot" style="background:${r.color}"></span><span class="cc-label">${r.label}</span><b>${costTotal?(r.val/costTotal*100).toFixed(1):'0.0'}%</b></div>`).join('');
+if($('#costLegend'))$('#costLegend').innerHTML=costLegendHtml;
+if($('#costLegendD'))$('#costLegendD').innerHTML=costLegendHtml;
+drawCostChart('costChart',costRows,costTotal);
+drawCostChart('costChartD',costRows,costTotal);
 /* ---- Insight & Rekomendasi otomatis ---- */
-if($('#insightList'))$('#insightList').innerHTML=buildInsightsHtml();
+let insightHtml=buildInsightsHtml();
+if($('#insightList'))$('#insightList').innerHTML=insightHtml;
+if($('#insightListD'))$('#insightListD').innerHTML=insightHtml;
 $('#rawTable').innerHTML=S.raw.map(r=>`<tr><td data-label="Bahan">${esc(r.name)}</td><td data-label="Stok">${kg(r.qty)}</td><td data-label="Harga/kg">${rp(r.price)}</td><td data-label="Transport">${rp(r.transport)}</td><td data-label="Biaya lain">${rp(r.other)}</td><td data-label="HPP masuk/kg">${rp(landed(r))}</td><td data-label="Nilai stok">${rp(r.qty*landed(r))}</td><td data-label="Supplier">${esc(r.supplier||'-')}</td><td data-label="Aksi"><button onclick="deleteRaw('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(9);
 $('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
 $('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td data-label="Batch">${b.code}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan Baku">${esc(b.rawName)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Input">${kg(b.input)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Penyusutan">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="HPP Batch">${rp(b.totalHpp)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Aksi"><button onclick="deleteBatch('${b.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(10);
