@@ -45,6 +45,9 @@ function debtRemaining(d){return Math.max(0,(+d.amount||0)-(+d.paidAmount||0))}
 function debtStatus(d){let r=debtRemaining(d);if(r<=0)return{label:'Lunas',cls:'badge-ok'};if(d.dueDate&&day(d.dueDate)<new Date(new Date().setHours(0,0,0,0)))return{label:'Jatuh Tempo',cls:'badge-overdue'};return{label:'Belum Lunas',cls:'badge-pending'}}
 function B(id){return S.batches.find(x=>x.id==id)}
 function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
+/* ---- Business Intelligence: rendemen, BEP, harga jual minimum, simulasi ---- */
+function yieldPct(b){return b.input?b.output/b.input*100:0}
+function getBiMargin(){let el=$('#biMarginTarget');return el?(+el.value||0):20}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
 function requireAdmin(){if(!isAdmin){alert('Silakan login sebagai admin terlebih dahulu.');return false}return true}
 /* Mengisi beberapa elemen sekaligus dengan konten yang sama (dipakai supaya panel Laba & Laporan tampil identik di Dashboard dan halaman Laporan) */
@@ -125,8 +128,8 @@ async function initAuth(){
 }
 
 /* ---- Charts ---- */
-let financeChart=null,productionChart=null;
-const PALETTE={ember:'#22C55E',gold:'#F5A524',red:'#F76E7E',green:'#22C55E',teal:'#2DD4CF',ink:'#F1F4EF',muted:'#8E9A8B',grid:'rgba(255,255,255,.08)'};
+let financeChart=null,productionChart=null,costChart=null;
+const PALETTE={ember:'#22C55E',gold:'#F5A524',red:'#F76E7E',green:'#22C55E',teal:'#2DD4CF',violet:'#A78BFA',ink:'#F1F4EF',muted:'#8E9A8B',grid:'rgba(255,255,255,.08)'};
 function drawCharts(){
  if(typeof Chart==='undefined')return;
  Chart.defaults.color=PALETTE.muted;Chart.defaults.font.family="'Inter',system-ui,sans-serif";Chart.defaults.borderColor=PALETTE.grid;
@@ -158,6 +161,44 @@ function drawCharts(){
    {label:'Bahan masuk (kg)',data:input,borderRadius:6,backgroundColor:'rgba(232,184,75,.75)'},
    {label:'Barang jadi (kg)',data:output,borderRadius:6,backgroundColor:PALETTE.ember}
  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:PALETTE.ink,boxWidth:9,boxHeight:9,usePointStyle:true,pointStyle:'circle',font:legendFont,padding:isSmall?10:14}}},scales:{x:{grid,ticks:{font:tickFont}},y:{beginAtZero:true,grid,ticks:{font:tickFont,callback:v=>v+' kg'}}}}});
+}
+
+/* ---- Chart komposisi biaya (donut) ---- */
+function drawCostChart(rows,total){
+ let el=$('#costChart');if(!el||typeof Chart==='undefined')return;
+ if(costChart)costChart.destroy();
+ if(!total){el.style.display='none';return}
+ el.style.display='';
+ costChart=new Chart(el,{type:'doughnut',data:{labels:rows.map(r=>r.label),datasets:[{data:rows.map(r=>r.val),backgroundColor:rows.map(r=>r.color),borderColor:'#121614',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${rp(c.parsed)} (${(c.parsed/total*100).toFixed(1)}%)`}}}}});
+}
+
+/* ---- Insight & Rekomendasi otomatis (rule-based dari data yang ada) ---- */
+function buildInsightsHtml(){
+ let insights=[];
+ let sorted=S.batches.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+ if(sorted.length>=2){
+   let prev=sorted[sorted.length-2],cur=sorted[sorted.length-1],py=yieldPct(prev),cy=yieldPct(cur),diff=cy-py;
+   if(Math.abs(diff)>=0.5)insights.push({type:diff>0?'up':'down',title:diff>0?'Rendemen meningkat':'Rendemen menurun',body:`${esc(cur.code)} ${diff>0?'naik':'turun'} ${Math.abs(diff).toFixed(1)} poin dibanding ${esc(prev.code)} (${py.toFixed(1)}% → ${cy.toFixed(1)}%).`});
+ }
+ let sellPriceOf=b=>{let ss=S.sales.filter(x=>x.batchId==b.id),q=ss.reduce((a,x)=>a+x.qty,0);return q?ss.reduce((a,x)=>a+x.total,0)/q:null};
+ let belowHpp=S.batches.map(b=>({b,p:sellPriceOf(b)})).filter(x=>x.p!==null&&x.p<x.b.hppkg);
+ if(belowHpp.length){
+   let prices=belowHpp.map(x=>x.p),minP=Math.min(...prices),maxP=Math.max(...prices),bepMin=Math.min(...belowHpp.map(x=>x.b.hppkg));
+   insights.push({type:'warn',title:'Harga jual masih di bawah HPP',body:`Harga jual efektif: ${rp(minP)} – ${rp(maxP)}/kg. BEP minimal: ${rp(bepMin)}/kg.`});
+ }
+ let saran=[];
+ let avgYieldAll=S.batches.length?S.batches.reduce((a,b)=>a+yieldPct(b),0)/S.batches.length:0;
+ if(S.batches.length&&avgYieldAll<27)saran.push('Tingkatkan rendemen produksi (target ≥27%).');
+ let highLoss=S.batches.filter(b=>b.lossPct>75);
+ if(highLoss.length)saran.push(`Evaluasi penyebab susut tinggi di ${highLoss.map(b=>esc(b.code)).join(', ')}.`);
+ if(belowHpp.length)saran.push('Naikkan harga jual atau cari pasar dengan harga lebih baik.');
+ if(saran.length)insights.push({type:'ok',title:'Saran fokus',body:saran});
+ if(!insights.length)return '<div class="stock-empty">Belum cukup data untuk insight. Tambahkan batch &amp; penjualan dulu.</div>';
+ return insights.map(i=>{
+   let icon=i.type==='up'?'▲':i.type==='down'?'▼':i.type==='warn'?'⚠':'✓';
+   let body=Array.isArray(i.body)?`<ol>${i.body.map(x=>`<li>${x}</li>`).join('')}</ol>`:`<p>${i.body}</p>`;
+   return `<div class="insight-card ins-${i.type}"><div class="insight-head"><span class="insight-ic">${icon}</span><b>${esc(i.title)}</b></div>${body}</div>`;
+ }).join('');
 }
 
 /* ---- Render ---- */
@@ -201,11 +242,57 @@ $('#lineStatsCards').innerHTML=Object.values(lineStats).length?Object.values(lin
   <div><span>Bahan Masuk</span><b>${kg(s.input)}</b></div>
   <div><span>Hasil Produksi</span><b>${kg(s.output)}</b></div>
   <div><span>Susut</span><b>${kg(s.loss)} (${lp.toFixed(1)}%)</b></div>
+  <div><span>Rendemen</span><b>${(s.input?s.output/s.input*100:0).toFixed(1)}%</b></div>
   <div><span>HPP / kg</span><b>${rp(avgHpp)}</b></div>
   <div><span>Stok Tersisa</span><b>${kg(sisaStok)}</b></div>
   <div><span>Nilai Stok</span><b>${rp(nilaiStok)}</b></div>
   </div></div>`;
 }).join(''):'<div class="stock-empty">Belum ada data produksi</div>';
+/* ---- Business Intelligence: ringkasan per lini (rendemen, HPP, BEP, harga rekomendasi, margin aktual) ---- */
+let biMargin=getBiMargin();
+let biRows=Object.values(lineStats).map(s=>{
+  let lineBatches=S.batches.filter(b=>b.rawName===s.raw&&b.productName===s.product),ids=new Set(lineBatches.map(b=>b.id));
+  let lineSales=S.sales.filter(x=>ids.has(x.batchId)),soldQty=lineSales.reduce((a,x)=>a+x.qty,0),soldRev=lineSales.reduce((a,x)=>a+x.total,0);
+  let avgSell=soldQty?soldRev/soldQty:0,avgYield=s.input?s.output/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;
+  let bep=avgHpp,rec=avgHpp*(1+biMargin/100),marginNow=soldQty?((avgSell-avgHpp)/avgSell*100):null;
+  return{raw:s.raw,product:s.product,avgYield,avgHpp,avgSell,soldQty,bep,rec,marginNow};
+});
+let biHtml=biRows.length?biRows.map(r=>`<tr><td data-label="Lini Produksi">${esc(r.raw)} → ${esc(r.product)}</td><td data-label="Rendemen">${r.avgYield.toFixed(1)}%</td><td data-label="HPP/kg">${rp(r.avgHpp)}</td><td data-label="BEP (Harga Min)">${rp(r.bep)}</td><td data-label="Harga Rekomendasi">${rp(r.rec)}</td><td data-label="Harga Jual Rata²">${r.soldQty?rp(r.avgSell):'—'}</td><td data-label="Margin Aktual">${r.marginNow===null?'— (belum terjual)':(r.marginNow<0?'<span class="neg">':'<span class="pos">')+r.marginNow.toFixed(1)+'%</span>'}</td></tr>`).join(''):empty(7);
+setAll(['biTable','biTableD'],biHtml,false);
+fillBiSimBatch();
+/* ---- BEP & Harga Jual Minimum (ringkasan global, seluruh batch) ---- */
+let totalOutputAll=S.batches.reduce((a,b)=>a+b.output,0),totalHppAll=S.batches.reduce((a,b)=>a+b.totalHpp,0);
+let globalBep=totalOutputAll?totalHppAll/totalOutputAll:0;
+let totalSoldQtyAll=S.sales.reduce((a,x)=>a+x.qty,0),totalSoldRevAll=S.sales.reduce((a,x)=>a+x.total,0);
+let globalAvgSell=totalSoldQtyAll?totalSoldRevAll/totalSoldQtyAll:0,sellGap=globalAvgSell-globalBep;
+if($('#bepValue'))$('#bepValue').textContent=rp(globalBep)+'/kg';
+if($('#bepCurrentPrice'))$('#bepCurrentPrice').textContent=totalSoldQtyAll?rp(globalAvgSell)+'/kg':'Belum ada penjualan';
+if($('#bepGap')){let g=$('#bepGap');g.textContent=totalSoldQtyAll?(sellGap<0?'-':'+')+rp(Math.abs(sellGap)):'—';g.className=sellGap<0?'neg':'pos'}
+if($('#bepCta'))$('#bepCta').style.display=(totalSoldQtyAll&&sellGap<0)?'block':'none';
+/* ---- Komposisi Biaya Produksi ---- */
+let costComp={bahan:0,transport:0,tenaga:0,energi:0,lain:0};
+S.batches.forEach(b=>{
+  let r=S.raw.find(x=>x.id===b.rawId),basis=r?(+r.originalQty||+r.qty||1):1;
+  let rawPrice=r?+r.price:0,rawTransport=r?+r.transport:0,rawOther=r?+r.other:0;
+  costComp.bahan+=b.input*rawPrice;
+  costComp.transport+=b.input*(rawTransport/basis);
+  costComp.lain+=b.input*(rawOther/basis)+(+b.other||0);
+  costComp.tenaga+=+b.labor||0;
+  costComp.energi+=+b.energy||0;
+});
+let costTotal=costComp.bahan+costComp.transport+costComp.tenaga+costComp.energi+costComp.lain;
+let costRows=[
+ {label:'Bahan Baku',val:costComp.bahan,color:PALETTE.ember},
+ {label:'Tenaga Kerja',val:costComp.tenaga,color:PALETTE.teal},
+ {label:'Energi & Bahan Bakar',val:costComp.energi,color:PALETTE.gold},
+ {label:'Transportasi',val:costComp.transport,color:PALETTE.violet},
+ {label:'Biaya Lain-lain',val:costComp.lain,color:PALETTE.muted}
+];
+if($('#costTotal'))$('#costTotal').textContent=rp(costTotal);
+if($('#costLegend'))$('#costLegend').innerHTML=costRows.map(r=>`<div class="cc-legend-row"><span class="cc-dot" style="background:${r.color}"></span><span class="cc-label">${r.label}</span><b>${costTotal?(r.val/costTotal*100).toFixed(1):'0.0'}%</b></div>`).join('');
+drawCostChart(costRows,costTotal);
+/* ---- Insight & Rekomendasi otomatis ---- */
+if($('#insightList'))$('#insightList').innerHTML=buildInsightsHtml();
 $('#rawTable').innerHTML=S.raw.map(r=>`<tr><td data-label="Bahan">${esc(r.name)}</td><td data-label="Stok">${kg(r.qty)}</td><td data-label="Harga/kg">${rp(r.price)}</td><td data-label="Transport">${rp(r.transport)}</td><td data-label="Biaya lain">${rp(r.other)}</td><td data-label="HPP masuk/kg">${rp(landed(r))}</td><td data-label="Nilai stok">${rp(r.qty*landed(r))}</td><td data-label="Supplier">${esc(r.supplier||'-')}</td><td data-label="Aksi"><button onclick="deleteRaw('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(9);
 $('#rawSelect').innerHTML=S.raw.filter(r=>r.qty>0).map(r=>`<option value="${r.id}">${esc(r.name)} — ${kg(r.qty)} @ ${rp(landed(r))}/kg</option>`).join('');
 $('#batchTable').innerHTML=S.batches.slice().reverse().map(b=>`<tr><td data-label="Batch">${b.code}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan Baku">${esc(b.rawName)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Input">${kg(b.input)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Penyusutan">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="HPP Batch">${rp(b.totalHpp)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Aksi"><button onclick="deleteBatch('${b.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(10);
@@ -224,14 +311,14 @@ animateNum(['psHpp','psHppD'],S.batches.reduce((a,b)=>a+b.totalHpp,0),rp);
 let productionDays=new Set(S.batches.map(b=>b.date).filter(Boolean)).size;
 animateNum(['psDays','psDaysD'],productionDays,v=>Math.round(v)+' hari');
 if($('#recentSub'))$('#recentSub').textContent=`5 batch produksi paling akhir · total ${productionDays} hari produksi tercatat`;
-let prodStatsHtml=Object.values(lineStats).map(s=>{let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0;return `<tr><td data-label="Lini Produksi">${esc(s.raw)} → ${esc(s.product)}</td><td data-label="Jumlah Batch">${s.batches}</td><td data-label="Total Masuk">${kg(s.input)}</td><td data-label="Total Jadi">${kg(s.output)}</td><td data-label="Total Susut">${kg(s.loss)}</td><td data-label="Rata² Susut">${lp.toFixed(1)}%</td><td data-label="Total HPP">${rp(s.hpp)}</td><td data-label="Rata² HPP/kg">${rp(avgHpp)}</td></tr>`}).join('')||empty(8);
+let prodStatsHtml=Object.values(lineStats).map(s=>{let lp=s.input?s.loss/s.input*100:0,avgHpp=s.output?s.hpp/s.output:0,avgYield=s.input?s.output/s.input*100:0;return `<tr><td data-label="Lini Produksi">${esc(s.raw)} → ${esc(s.product)}</td><td data-label="Jumlah Batch">${s.batches}</td><td data-label="Total Masuk">${kg(s.input)}</td><td data-label="Total Jadi">${kg(s.output)}</td><td data-label="Total Susut">${kg(s.loss)}</td><td data-label="Rata² Susut">${lp.toFixed(1)}%</td><td data-label="Rata² Rendemen">${avgYield.toFixed(1)}%</td><td data-label="Total HPP">${rp(s.hpp)}</td><td data-label="Rata² HPP/kg">${rp(avgHpp)}</td></tr>`}).join('')||empty(9);
 setAll(['prodStatsTable','prodStatsTableD'],prodStatsHtml,false);
 /* Untung/Rugi per batch — data lengkap untuk evaluasi perusahaan — tampil di halaman Laporan & juga di Dashboard */
 let profitHtml=S.batches.slice().reverse().map(b=>{
   let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc,sisa=b.output-q;
   let status=q===0?{t:'Belum Terjual',c:'badge-pending'}:l>0?{t:'Untung',c:'badge-ok'}:l<0?{t:'Rugi',c:'badge-overdue'}:{t:'Impas',c:'badge-pending'};
-  return `<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan → Produk">${esc(b.rawName)} → ${esc(b.productName)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Susut">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Terjual">${kg(q)}</td><td data-label="Sisa Stok">${kg(sisa)}</td><td data-label="Omzet">${rp(om)}</td><td data-label="Untung/Rugi">${signed(l)}</td><td data-label="Margin">${om?(l/om*100).toFixed(1):0}%</td><td data-label="Status"><span class="badge ${status.c}">${status.t}</span></td></tr>`;
-}).join('')||empty(12);
+  return `<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan → Produk">${esc(b.rawName)} → ${esc(b.productName)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Susut">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="Rendemen">${yieldPct(b).toFixed(1)}%</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Terjual">${kg(q)}</td><td data-label="Sisa Stok">${kg(sisa)}</td><td data-label="Omzet">${rp(om)}</td><td data-label="Untung/Rugi">${signed(l)}</td><td data-label="Margin">${om?(l/om*100).toFixed(1):0}%</td><td data-label="Status"><span class="badge ${status.c}">${status.t}</span></td></tr>`;
+}).join('')||empty(13);
 setAll(['profitTable','profitTableD'],profitHtml,false);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
 let batchProfit=S.batches.map(b=>{let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0);return{q,l:om-q*b.hppkg}});
@@ -462,6 +549,42 @@ $('#reset').onclick=async()=>{
   await loadAll();render();
 };
 document.addEventListener('change',e=>{if(e.target&&e.target.id==='chartYear')drawCharts()});
+
+/* ---- Simulasi rendemen: "kalau rendemen naik X%, berapa tambahan laba?" ---- */
+function fillBiSimBatch(){
+  let el=$('#biSimBatch');if(!el)return;
+  let cur=el.value;
+  el.innerHTML=S.batches.length?S.batches.slice().reverse().map(b=>`<option value="${b.id}">${esc(b.code)} — ${esc(b.productName)} (rendemen ${yieldPct(b).toFixed(1)}%)</option>`).join(''):'<option value="">Belum ada batch</option>';
+  if(cur&&S.batches.some(b=>b.id==cur))el.value=cur;
+  updateBiSim();
+}
+function updateBiSim(){
+  let sel=$('#biSimBatch'),rangeEl=$('#biSimDelta'),priceEl=$('#biSimPrice'),out=$('#biSimResult');
+  if(!sel||!rangeEl||!priceEl||!out)return;
+  let b=B(sel.value);
+  if(!b){out.innerHTML='<div class="stock-empty">Belum ada batch untuk disimulasikan.</div>';return}
+  let delta=+rangeEl.value||0;
+  if($('#biSimDeltaVal'))$('#biSimDeltaVal').textContent=(delta>=0?'+':'')+delta+'%';
+  let curYield=yieldPct(b),newYield=Math.max(0,curYield+delta),newOutput=b.input*newYield/100;
+  let newHpp=newOutput?b.totalHpp/newOutput:0;
+  let ss=S.sales.filter(x=>x.batchId==b.id),sq=ss.reduce((a,x)=>a+x.qty,0),som=ss.reduce((a,x)=>a+x.total,0);
+  let defaultPrice=sq?som/sq:b.hppkg*(1+getBiMargin()/100);
+  if(priceEl.dataset.batch!==String(b.id)){priceEl.value=Math.round(defaultPrice);priceEl.dataset.batch=String(b.id)}
+  let price=+priceEl.value||0;
+  let curProfitTotal=(price-b.hppkg)*b.output,newProfitTotal=(price-newHpp)*newOutput,extra=newProfitTotal-curProfitTotal;
+  out.innerHTML=`<div class="bi-sim-grid">
+    <div><span>Rendemen Sekarang</span><b>${curYield.toFixed(1)}%</b></div>
+    <div><span>Rendemen Simulasi</span><b>${newYield.toFixed(1)}%</b></div>
+    <div><span>HPP/kg Sekarang</span><b>${rp(b.hppkg)}</b></div>
+    <div><span>HPP/kg Simulasi</span><b>${rp(newHpp)}</b></div>
+    <div><span>Hasil Produksi Sekarang</span><b>${kg(b.output)}</b></div>
+    <div><span>Hasil Produksi Simulasi</span><b>${kg(newOutput)}</b></div>
+    <div class="span-full"><span>Tambahan Laba (di harga jual ${rp(price)}/kg, bahan masuk ${kg(b.input)} sama)</span><b class="${extra<0?'neg':'pos'}">${extra<0?'-':'+'}${rp(Math.abs(extra))}</b></div>
+  </div>`;
+}
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='biMarginTarget')render()});
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='biSimBatch'){$('#biSimPrice').dataset.batch='';updateBiSim()}});
+document.addEventListener('input',e=>{if(e.target&&(e.target.id==='biSimDelta'||e.target.id==='biSimPrice'))updateBiSim()});
 
 /* ---- Login / Logout ---- */
 $('#loginBtn').onclick=()=>{$('#loginError').textContent='';$('#loginModal').classList.add('show')};
