@@ -206,6 +206,67 @@ h2::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--pr
 .line-stats-mini div span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
 .line-stats-mini div b{display:block;font-family:var(--font-mono);font-size:13.5px;margin-top:3px;color:var(--ink)}
 
+/* ---------- Business Intelligence ---------- */
+.bi-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:13px;padding:12px 14px;margin:12px 0}
+.bi-controls label{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin:0}
+.bi-controls input{width:90px;margin:0;padding:8px 10px}
+.bi-controls .hint{margin:0;flex:1 1 220px}
+.bi-sim-panel{position:relative}
+.bi-sim-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:12px 0 4px}
+.bi-sim-controls label{display:block;font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.bi-sim-controls input,.bi-sim-controls select{margin-top:7px}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border-soft);padding:0;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary);border:3px solid var(--surface);box-shadow:0 0 0 1px var(--primary-deep);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--primary);border:3px solid var(--surface);box-shadow:0 0 0 1px var(--primary-deep);cursor:pointer}
+.bi-sim-result{margin-top:14px}
+.bi-sim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.bi-sim-grid div{background:var(--surface-2);border-radius:12px;padding:11px 13px;border:1px solid var(--border-soft)}
+.bi-sim-grid div span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.bi-sim-grid div b{display:block;font-family:var(--font-mono);font-size:15px;margin-top:5px;color:var(--ink)}
+.bi-sim-grid div b.pos{color:var(--primary)}
+.bi-sim-grid div b.neg{color:var(--red)}
+@media(max-width:640px){.bi-sim-controls{grid-template-columns:1fr}}
+
+/* ---------- BEP widget & Komposisi Biaya ---------- */
+.bi-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.bi-grid-2{grid-template-columns:1fr}}
+.bep-panel{display:flex;flex-direction:column}
+.bep-hero{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:14px;padding:16px;margin:12px 0;text-align:center}
+.bep-hero-label{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:600;margin-bottom:6px}
+.bep-hero b{font-family:var(--font-mono);font-size:26px;color:var(--primary)}
+.bep-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bep-compare div{background:var(--surface-2);border-radius:11px;padding:10px 12px;border:1px solid var(--border-soft)}
+.bep-compare span{display:block;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.bep-compare b{display:block;font-family:var(--font-mono);font-size:14px;margin-top:5px;color:var(--ink)}
+.bep-cta{margin-top:12px;background:var(--primary-soft);color:var(--primary);border:1px solid rgba(34,197,94,.3);border-radius:11px;padding:11px;text-align:center;font-weight:700;font-size:12.5px}
+.cost-comp-body{display:flex;align-items:center;gap:18px;margin-top:8px;flex-wrap:wrap}
+.cost-chart-wrap{position:relative;width:150px;height:150px;flex:0 0 150px}
+.cost-chart-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.cost-chart-center span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+.cost-chart-center b{font-family:var(--font-mono);font-size:12px;color:var(--ink);margin-top:4px;max-width:110px}
+.cost-legend{flex:1 1 180px;display:flex;flex-direction:column;gap:9px}
+.cc-legend-row{display:flex;align-items:center;gap:9px;font-size:12px}
+.cc-dot{width:9px;height:9px;border-radius:50%;flex:0 0 9px}
+.cc-label{flex:1;color:var(--muted)}
+.cc-legend-row b{font-family:var(--font-mono);color:var(--ink);font-size:12.5px}
+
+/* ---------- Insight & Rekomendasi ---------- */
+.insight-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:12px}
+.insight-card{border-radius:14px;padding:13px 15px;border:1px solid var(--border-soft);background:var(--surface-2)}
+.insight-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.insight-ic{font-size:13px;line-height:1}
+.insight-head b{font-size:12.5px;color:var(--ink)}
+.insight-card p{margin:0;font-size:12px;color:var(--muted);line-height:1.5}
+.insight-card ol{margin:0;padding-left:16px;font-size:12px;color:var(--muted);line-height:1.6}
+.insight-card.ins-up{border-color:rgba(34,197,94,.3)}
+.insight-card.ins-up .insight-ic{color:var(--primary)}
+.insight-card.ins-down{border-color:rgba(247,110,126,.3)}
+.insight-card.ins-down .insight-ic{color:var(--red)}
+.insight-card.ins-warn{border-color:rgba(245,165,36,.3)}
+.insight-card.ins-warn .insight-ic{color:var(--amber)}
+.insight-card.ins-ok{border-color:rgba(34,197,94,.3)}
+.insight-card.ins-ok .insight-ic{color:var(--primary)}
+
 /* ---------- Statistik Susut per Batch ---------- */
 .batch-loss-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:13px}
 .batch-loss-card{background:var(--surface-2);border:1px solid var(--border-soft);border-radius:14px;padding:13px 14px;transition:transform .15s ease,border-color .15s ease}
