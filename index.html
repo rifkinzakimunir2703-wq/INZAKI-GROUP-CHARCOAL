@@ -14,10 +14,51 @@
 <section id="dashboard" class="page active">
 
 <div class="section-block">
-<div class="section-label">Bahan Baku &amp; Barang Jadi</div>
+<div class="section-label">Ringkasan Cepat</div>
+<div class="cards quick-glance">
+<div><span>Nilai Stok Bahan Baku</span><b id="qgRawValue">Rp0</b><small id="qgRawQty">0 kg tersimpan</small></div>
+<div><span>Nilai Stok Barang Jadi</span><b id="qgFinValue">Rp0</b><small id="qgFinQty">0 kg siap jual</small></div>
+<div><span>Batch Bulan Ini</span><b id="qgBatchMonth">0</b><small id="qgOutputMonth">0 kg dihasilkan</small></div>
+<div><span>Rata² Rendemen Keseluruhan</span><b id="qgYieldAvg">0%</b><small id="qgYieldTrend">Belum ada tren</small></div>
+</div>
+</div>
+
+<div class="section-block">
+<div class="section-label">Insight &amp; Rekomendasi</div>
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan — hal yang paling perlu ditindaklanjuti hari ini</small></div></div>
+<div id="insightList" class="insight-list"></div>
+</div>
+</div>
+
+<div class="section-block">
+<div class="section-label">Alur Produksi</div>
+<div class="panel flow-panel">
+<div class="panel-head"><div><h2>Kelapa → Kopra &amp; Arang</h2><small>Batok kelapa adalah hasil sampingan dari kelapa, bukan bahan baku terpisah yang dibeli — jumlahnya tidak dobel-hitung ke total bahan baku masuk</small></div></div>
+<div class="flow-diagram">
+<div class="flow-node flow-source"><span class="flow-node-tag">Bahan Utama</span><b>Kelapa</b><small>Dibeli dari petani/supplier</small></div>
+<div class="flow-arrow">→</div>
+<div class="flow-branch">
+<div class="flow-node flow-product"><span class="flow-node-tag">Diolah jadi</span><b>Kopra</b><small>Dari daging kelapa</small></div>
+<div class="flow-node flow-mid"><span class="flow-node-tag">Sampingan</span><b>Batok Kelapa</b><small>Dari tempurung kelapa</small></div>
+</div>
+<div class="flow-arrow flow-arrow-2">→</div>
+<div class="flow-node flow-product flow-final"><span class="flow-node-tag">Diolah jadi</span><b>Arang</b><small>Dari batok kelapa</small></div>
+</div>
+</div>
+</div>
+
+<div class="section-block">
+<div class="section-label">Stok Bahan Baku &amp; Barang Jadi</div>
+<div class="stock-grid-2">
 <div class="panel stock-panel">
-<div class="panel-head"><div><h2>Ringkasan Stok</h2><small>Bahan baku dan barang jadi ditampilkan terpisah per jenis</small></div></div>
-<div id="stockCards" class="stock-cards"></div>
+<div class="panel-head"><div><h2>Stok Bahan Baku</h2><small>Tiap jenis bahan ditampilkan terpisah, jumlah tidak digabung</small></div></div>
+<div id="stockCardsRaw" class="stock-cards"></div>
+</div>
+<div class="panel stock-panel">
+<div class="panel-head"><div><h2>Stok Barang Jadi</h2><small>Tiap jenis produk ditampilkan terpisah</small></div></div>
+<div id="stockCardsFinished" class="stock-cards"></div>
+</div>
 </div>
 </div>
 
@@ -26,14 +67,14 @@
 <div id="lineStatsCards" class="line-stats-grid"></div>
 </div>
 
+<div class="panel chart-panel">
+<div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
+<canvas id="productionChart"></canvas>
+</div>
+
 <div class="panel batch-loss-panel">
 <div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
 <div id="batchLossList" class="batch-loss-list"></div>
-</div>
-
-<div class="panel">
-<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan</small></div></div>
-<div id="insightList" class="insight-list"></div>
 </div>
 
 <div class="panel bi-sim-panel">
@@ -44,11 +85,6 @@
 <label>Asumsi Harga Jual/kg (Rp)<input type="number" id="biSimPrice" min="0" step="100"></label>
 </div>
 <div id="biSimResult" class="bi-sim-result"></div>
-</div>
-
-<div class="panel chart-panel">
-<div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
-<canvas id="productionChart"></canvas>
 </div>
 
 <div class="panel"><div class="panel-head"><div><h2>Batch Terbaru</h2><small id="recentSub">5 batch produksi paling akhir</small></div></div><div id="recent"></div></div>
@@ -72,7 +108,8 @@
 <div><span>Laba Bulanan</span><b id="dProfitMonth">Rp0</b><small>Omzet − HPP − pengeluaran</small></div>
 <div><span>Pengeluaran Mingguan</span><b id="dExpenseWeek">Rp0</b></div>
 <div><span>Pengeluaran Bulanan</span><b id="dExpenseMonth">Rp0</b></div>
-<div class="span-full"><span>Hutang Perusahaan (Sisa Belum Lunas)</span><b id="dDebtOutstanding">Rp0</b><small id="dDebtInfo">0 kreditur aktif</small><div id="dDebtBreakdown" class="breakdown"></div></div></div>
+<div class="accent-amber"><span>Piutang Belum Tertagih</span><b id="dReceivable">Rp0</b><small id="dReceivableInfo">0 transaksi</small></div>
+<div class="span-full accent-red"><span>Hutang Perusahaan (Sisa Belum Lunas)</span><b id="dDebtOutstanding">Rp0</b><small id="dDebtInfo">0 kreditur aktif</small><div id="dDebtBreakdown" class="breakdown"></div></div></div>
 
 <div class="panel chart-panel">
 <div class="panel-head"><div><h2>Arus Keuangan</h2><small>Omzet, HPP, pengeluaran dan laba</small></div><select id="chartYear"></select></div>
@@ -90,6 +127,7 @@
 <span>Total HPP Produksi<b id="psHppD">Rp0</b></span>
 <span>Total Hari Produksi<b id="psDaysD">0 hari</b></span>
 </div>
+<div class="input-breakdown"><small>Total Bahan Masuk per jenis bahan baku (tidak digabung)</small><div id="psInputBreakdownD" class="input-breakdown-list"></div></div>
 <table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTableD"></tbody></table>
 </div>
 
@@ -136,31 +174,31 @@
 
 </section>
 
-<section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><form id="rawForm" class="form">
+<section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><p class="hint">Setiap jenis bahan (Kelapa, Batok Kelapa, dll) dicatat &amp; dihitung <b>terpisah per nama</b> — stok dan totalnya tidak digabung dengan bahan lain. Batok Kelapa adalah hasil sampingan dari Kelapa (lihat Alur Produksi di Dashboard), jadi isi qty-nya sesuai jumlah tempurung yang benar-benar diperoleh dari kelapa yang diolah, bukan jumlah kelapa itu sendiri.</p><form id="rawForm" class="form">
 <label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label>
 <label>Qty (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga bahan/kg (Rp)<input type=number name=price min=0 required></label>
 <label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label>
 <label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div>
 <button class="primary full">Tambah Stok Bahan</button></form></div>
-<div class="panel"><h2>Stok Bahan Baku</h2><table><thead><tr><th>Bahan</th><th>Stok</th><th>Harga/kg</th><th>Transport</th><th>Biaya lain</th><th>HPP masuk/kg</th><th>Nilai stok</th><th>Supplier</th><th>AKSI</th></tr></thead><tbody id="rawTable"></tbody></table></div></section>
+<div class="panel"><div class="panel-head"><h2>Stok Bahan Baku</h2><input type="text" id="searchRaw" class="table-search" placeholder="Cari bahan / supplier…"></div><table><thead><tr><th>Bahan</th><th>Stok</th><th>Harga/kg</th><th>Transport</th><th>Biaya lain</th><th>HPP masuk/kg</th><th>Nilai stok</th><th>Supplier</th><th>AKSI</th></tr></thead><tbody id="rawTable"></tbody></table></div></section>
 
 <section id="batch" class="page"><div class="panel"><h2>Buat Batch Produksi</h2><p class="hint">Biaya transportasi dan biaya lain-lain bahan baku otomatis ikut masuk ke HPP bahan yang dipakai.</p><form id="batchForm" class="form">
 <label>Tanggal<input type=date name=date required></label><label>Bahan baku<select name=rawId id="rawSelect" required></select></label><label>Nama produk jadi<input name=productName placeholder="Contoh: Kopra, Arang" required></label><label>Qty bahan dipakai (kg)<input type=number name=inputQty min=0 step=.01 required></label><label>Hasil produksi (kg)<input type=number name=outputQty min=0 step=.01 required></label>
 <label>Tenaga kerja (Rp)<input type=number name=labor min=0 value=0></label><label>Energi/bahan bakar (Rp)<input type=number name=energy min=0 value=0></label><label>Biaya produksi lain (Rp)<input type=number name=other min=0 value=0></label><label>Catatan<input name=note></label><button class="primary full">Simpan Batch Produksi</button></form></div>
-<div class="panel"><h2>Riwayat Batch</h2><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan Baku</th><th>Produk Jadi</th><th>Input</th><th>Output</th><th>Penyusutan</th><th>HPP Batch</th><th>HPP/kg</th><th>AKSI</th></tr></thead><tbody id="batchTable"></tbody></table></div></section>
+<div class="panel"><div class="panel-head"><h2>Riwayat Batch</h2><input type="text" id="searchBatch" class="table-search" placeholder="Cari kode / produk…"></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Bahan Baku</th><th>Produk Jadi</th><th>Input</th><th>Output</th><th>Penyusutan</th><th>HPP Batch</th><th>HPP/kg</th><th>AKSI</th></tr></thead><tbody id="batchTable"></tbody></table></div></section>
 
 <section id="finished" class="page"><div class="panel"><h2>Stok Barang Jadi</h2><div class="cards mini"><div><span>Stok</span><b id="fQty">0 kg</b></div><div><span>Nilai HPP</span><b id="fValue">Rp0</b></div><div><span>Rata-rata HPP/kg</span><b id="fAvg">Rp0</b></div></div><table><thead><tr><th>Batch</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedTable"></tbody></table></div></section>
 
-<section id="sales" class="page"><div class="panel"><h2>Penjualan</h2><form id="salesForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Batch<select name=batchId id="salesBatch" required></select></label><label>Pelanggan<input name=customer required></label><label>Qty terjual (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga jual/kg (Rp)<input type=number name=price min=0 required></label><label>Status<select name=status><option>Lunas</option><option>Piutang</option></select></label><button class="primary full">Simpan Penjualan</button></form></div><div class="panel"><h2>Riwayat Penjualan</h2><table><thead><tr><th>Tanggal</th><th>Batch</th><th>Pelanggan</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Laba</th><th>AKSI</th></tr></thead><tbody id="salesTable"></tbody></table></div></section>
+<section id="sales" class="page"><div class="panel"><h2>Penjualan</h2><form id="salesForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Batch<select name=batchId id="salesBatch" required></select></label><label>Pelanggan<input name=customer required></label><label>Qty terjual (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga jual/kg (Rp)<input type=number name=price min=0 required></label><label>Status<select name=status><option>Lunas</option><option>Piutang</option></select></label><button class="primary full">Simpan Penjualan</button></form></div><div class="panel"><div class="panel-head"><h2>Riwayat Penjualan</h2><input type="text" id="searchSales" class="table-search" placeholder="Cari pelanggan / invoice…"></div><table><thead><tr><th>Invoice</th><th>Tanggal</th><th>Batch</th><th>Pelanggan</th><th>Qty</th><th>Omzet</th><th>HPP</th><th>Laba</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="salesTable"></tbody></table></div></section>
 
-<section id="expenses" class="page"><div class="panel"><h2>Pengeluaran Umum</h2><form id="expenseForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Kategori<select name=cat><option>Transportasi</option><option>Administrasi</option><option>Packaging</option><option>Maintenance</option><option>Lainnya</option></select></label><label>Deskripsi<input name=desc required></label><label>Jumlah (Rp)<input type=number name=amount min=0 required></label><button class="primary full">Simpan Pengeluaran</button></form></div><div class="panel"><h2>Riwayat Pengeluaran</h2><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Jumlah</th><th>AKSI</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
+<section id="expenses" class="page"><div class="panel"><h2>Pengeluaran Umum</h2><form id="expenseForm" class="form"><label>Tanggal<input type=date name=date required></label><label>Kategori<select name=cat><option>Transportasi</option><option>Administrasi</option><option>Packaging</option><option>Maintenance</option><option>Lainnya</option></select></label><label>Deskripsi<input name=desc required></label><label>Jumlah (Rp)<input type=number name=amount min=0 required></label><button class="primary full">Simpan Pengeluaran</button></form></div><div class="panel"><div class="panel-head"><h2>Riwayat Pengeluaran</h2><input type="text" id="searchExpense" class="table-search" placeholder="Cari kategori / deskripsi…"></div><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Deskripsi</th><th>Jumlah</th><th>AKSI</th></tr></thead><tbody id="expenseTable"></tbody></table></div></section>
 
 <section id="debts" class="page"><div class="panel"><h2>Input Hutang Perusahaan</h2><p class="hint">Catat pinjaman/hutang dari bank, supplier, atau pihak lain. Bisa dibayar cicilan bertahap.</p><form id="debtForm" class="form">
 <label>Tanggal<input type=date name=date required></label><label>Kreditur / Pemberi Pinjaman<input name=creditor placeholder="Contoh: Bank BRI, Supplier X" required></label>
 <label>Keterangan<input name=desc placeholder="Contoh: Modal kerja, pembelian mesin"></label><label>Jumlah Hutang (Rp)<input type=number name=amount min=0 required></label>
 <label>Jatuh Tempo<input type=date name=dueDate></label>
 <button class="primary full">Simpan Hutang</button></form></div>
-<div class="panel"><h2>Riwayat Hutang</h2><table><thead><tr><th>Tanggal</th><th>Kreditur</th><th>Keterangan</th><th>Jumlah</th><th>Terbayar</th><th>Sisa</th><th>Jatuh Tempo</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="debtTable"></tbody></table></div></section>
+<div class="panel"><div class="panel-head"><h2>Riwayat Hutang</h2><input type="text" id="searchDebt" class="table-search" placeholder="Cari kreditur…"></div><table><thead><tr><th>Tanggal</th><th>Kreditur</th><th>Keterangan</th><th>Jumlah</th><th>Terbayar</th><th>Sisa</th><th>Jatuh Tempo</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="debtTable"></tbody></table></div></section>
 
 <section id="reports" class="page">
 
@@ -175,6 +213,7 @@
 <span>Total HPP Produksi<b id="psHpp">Rp0</b></span>
 <span>Total Hari Produksi<b id="psDays">0 hari</b></span>
 </div>
+<div class="input-breakdown"><small>Total Bahan Masuk per jenis bahan baku (tidak digabung)</small><div id="psInputBreakdown" class="input-breakdown-list"></div></div>
 <table><thead><tr><th>Lini Produksi</th><th>Jumlah Batch</th><th>Total Masuk</th><th>Total Jadi</th><th>Total Susut</th><th>Rata² Susut</th><th>Rata² Rendemen</th><th>Total HPP</th><th>Rata² HPP/kg</th></tr></thead><tbody id="prodStatsTable"></tbody></table>
 </div>
 
@@ -221,6 +260,9 @@
 <button class="primary full">Masuk</button></form>
 <p class="login-error" id="loginError"></p>
 <button class="ghost full" id="loginCancel">Batal</button></div></div>
+<div id="confirmModal" class="modal"><div class="modalbox confirm-box"><h2 id="confirmTitle">Konfirmasi</h2><p id="confirmMsg" class="confirm-msg"></p><div class="confirm-actions"><button class="ghost" id="confirmCancel">Batal</button><button class="danger" id="confirmOk">Ya, Lanjutkan</button></div></div></div>
+<div id="promptModal" class="modal"><div class="modalbox confirm-box"><h2 id="promptTitle">Konfirmasi</h2><p id="promptMsg" class="confirm-msg"></p><input type="number" id="promptInput" class="full" min="0"><div class="confirm-actions"><button class="ghost" id="promptCancel">Batal</button><button class="primary" id="promptOk">Simpan</button></div></div></div>
+<div id="toastStack" class="toast-stack" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
