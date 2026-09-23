@@ -153,8 +153,23 @@ h2::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--pr
 .cards.quick-glance>div:nth-child(2){--card-accent:var(--teal)}
 .cards.quick-glance>div:nth-child(3){--card-accent:var(--primary)}
 .cards.quick-glance>div:nth-child(4){--card-accent:var(--primary-deep)}
+.cards.batch-stats{grid-template-columns:repeat(4,1fr);margin-bottom:12px}
+.cards.batch-stats>div:nth-child(1){--card-accent:var(--primary)}
+.cards.batch-stats>div:nth-child(2){--card-accent:var(--amber)}
+.cards.batch-stats>div:nth-child(3){--card-accent:var(--teal)}
+.cards.batch-stats>div:nth-child(4){--card-accent:var(--primary-deep)}
 .stock-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:1050px){.stock-grid-2{grid-template-columns:1fr}}
+
+/* ---- Filter & sort Riwayat Batch ---- */
+.batch-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.batch-filters select,.batch-filters input{width:auto;min-width:150px;flex:1 1 150px;margin-top:0}
+.table-wrap{width:100%}
+.rendemen-pill{display:inline-block;padding:3px 10px;border-radius:999px;font-family:var(--font-mono);font-size:11.5px;font-weight:700}
+.rendemen-pill.good{background:var(--primary-soft);color:var(--primary)}
+.rendemen-pill.warn{background:var(--amber-soft);color:var(--amber)}
+.rendemen-pill.bad{background:var(--red-soft);color:var(--red)}
+@media(max-width:640px){.batch-filters select,.batch-filters input{flex:1 1 100%}}
 .cards span,.stats span,.report span{color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
 .cards b{display:block;font-family:var(--font-mono);font-weight:700;font-size:20px;margin-top:8px;letter-spacing:.1px;font-variant-numeric:tabular-nums;color:var(--ink)}
 .cards small{display:block;color:var(--muted-2);margin-top:5px;font-size:10.5px}
@@ -408,6 +423,26 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,va
 .cost span,.cost small{display:block;color:var(--muted);font-size:10.5px}
 .cost b{display:block;font-family:var(--font-mono);font-size:18px;margin:4px 0;color:var(--amber)}
 
+/* ---- Info lot bahan baku terpilih (form Produksi Batch) ---- */
+.field-hint{display:block;text-transform:none;letter-spacing:0;font-weight:500;color:var(--muted);font-size:10.5px;margin-top:5px}
+.btn-sellall{background:var(--primary-soft);color:var(--primary);border:1px solid rgba(34,197,94,.3);padding:9px 12px;border-radius:9px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;margin-top:6px}
+.btn-sellall:hover{filter:brightness(1.05)}
+.lot-count{color:var(--muted);font-weight:500}
+
+/* ---- Preview rendemen real-time saat isi form produksi ---- */
+.yield-preview{grid-column:1/-1;margin-top:-4px}
+.yield-preview-box{display:flex;align-items:center;gap:12px;background:var(--surface-2);border:1px solid var(--border-soft);border-radius:12px;padding:11px 14px}
+.yield-preview-box span{color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.yield-preview-box b{font-family:var(--font-mono);font-size:19px;color:var(--ink)}
+.yield-preview-box small{color:var(--muted);font-size:11px;margin-left:auto}
+.yield-preview-box.good{border-color:rgba(34,197,94,.35)}
+.yield-preview-box.good b{color:var(--primary)}
+.yield-preview-box.warn{border-color:rgba(245,165,36,.35)}
+.yield-preview-box.warn b{color:var(--amber)}
+.yield-preview-box.bad{border-color:rgba(247,110,126,.35)}
+.yield-preview-box.bad b{color:var(--red)}
+.rendemen-val{font-family:var(--font-mono);color:var(--primary)}
+
 /* ---------- Modal ---------- */
 .modal{display:none;position:fixed;inset:0;background:rgba(4,6,4,.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;z-index:20}
 .modal.show{display:flex}
@@ -468,6 +503,8 @@ tbody tr:nth-child(even) td{background:rgba(255,255,255,.014)}
 
   .global,.cards,.mini,.report{grid-template-columns:1fr}
   .cards.quick-glance{grid-template-columns:1fr 1fr}
+  .yield-preview-box{flex-wrap:wrap}
+  .yield-preview-box small{margin-left:0}
   .stock-cards{grid-template-columns:1fr 1fr;gap:8px}
   .stock-card{padding:11px}
   .stock-card-qty{font-size:17px}
