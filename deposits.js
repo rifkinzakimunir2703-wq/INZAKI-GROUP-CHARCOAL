@@ -16,6 +16,13 @@ const dpByDate = (a, b) => a.date === b.date ? 0 : (a.date < b.date ? 1 : -1);
 function dpAllocs(){ const ids = new Set((S.raw || []).map(r => String(r.id))); return DP.alloc.filter(a => ids.has(a.rawId)); }
 DP.allocByRaw = () => { const m = {}; dpAllocs().forEach(a => m[a.rawId] = (m[a.rawId] || 0) + a.amount); return m; };
 
+/* ---- Hero bergambar (dipakai halaman DP & Keuangan) ---- */
+let _dpHeroN=0;
+function dpHero(title, text, chip){
+  const u=++_dpHeroN;   // id gradien unik per hero (gradien di halaman tersembunyi tidak ter-render)
+  return `<div class="hero"><svg viewBox="0 0 900 240" preserveAspectRatio="xMaxYMid slice" aria-hidden="true"><defs><linearGradient id="dpSk" x1="0" x2="1"><stop offset="0" stop-color="#0B1F17"/><stop offset=".55" stop-color="#174D37"/><stop offset="1" stop-color="#1F6B45"/></linearGradient><radialGradient id="dpGold"><stop offset="0" stop-color="#F8DC85"/><stop offset="1" stop-color="#D4A02E"/></radialGradient></defs><rect width="900" height="240" fill="url(#dpSk)"/><circle class="dp-glow" cx="700" cy="110" r="95" fill="#E3B94F" opacity=".12"/><path d="M300 240V178Q420 132 540 172T780 160T900 150V240Z" fill="#134632" opacity=".9"/><rect y="208" width="900" height="32" fill="#08160F"/><use href="#palm" transform="translate(560 214) scale(.9)"/><use href="#palm" transform="translate(858 214) scale(1.1)"/><g class="dp-stack" transform="translate(700 206)"><g transform="translate(0 0)"><ellipse rx="44" ry="11" cy="2" fill="#B8871F"/><rect x="-44" y="-9" width="88" height="11" fill="#D4A02E"/><ellipse rx="44" ry="11" cy="-9" fill="url(#dpGold)"/></g><g transform="translate(0 -12)"><ellipse rx="44" ry="11" cy="2" fill="#B8871F"/><rect x="-44" y="-9" width="88" height="11" fill="#D4A02E"/><ellipse rx="44" ry="11" cy="-9" fill="url(#dpGold)"/></g><g transform="translate(0 -24)"><ellipse rx="44" ry="11" cy="2" fill="#B8871F"/><rect x="-44" y="-9" width="88" height="11" fill="#D4A02E"/><ellipse rx="44" ry="11" cy="-9" fill="url(#dpGold)"/></g><g transform="translate(0 -36)"><ellipse rx="44" ry="11" cy="2" fill="#B8871F"/><rect x="-44" y="-9" width="88" height="11" fill="#D4A02E"/><ellipse rx="44" ry="11" cy="-9" fill="url(#dpGold)"/></g></g><g transform="translate(640 100)"><g class="dp-coin "><circle r="17" fill="url(#dpGold)" stroke="#B8871F" stroke-width="3"/><text y="5" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="#7A5A12" text-anchor="middle">Rp</text></g></g><g transform="translate(760 70)"><g class="dp-coin d2"><circle r="17" fill="url(#dpGold)" stroke="#B8871F" stroke-width="3"/><text y="5" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="#7A5A12" text-anchor="middle">Rp</text></g></g><g transform="translate(700 40)"><g class="dp-coin d3"><circle r="17" fill="url(#dpGold)" stroke="#B8871F" stroke-width="3"/><text y="5" font-family="Arial,sans-serif" font-weight="700" font-size="13" fill="#7A5A12" text-anchor="middle">Rp</text></g></g></svg><div class="hero-text"><div class="hero-title">${title}</div><p>${text}</p><span class="hero-chip"><i></i>${chip}</span></div></div>`.replace(/dpSk|dpGold/g, m => m + u);
+}
+
 /* ---- Muat data dari Supabase ---- */
 async function loadDeposits(){
   if(!sb || !isAdmin) return;   // data DP hanya untuk admin
@@ -82,15 +89,15 @@ function renderDeposits(){
   const byF = {};
   open.forEach(d => { const k = dpNorm(d.farmer), f = byF[k] = byF[k] || { name: d.farmer, left: 0, n: 0, since: d.date }; f.left += d.left; f.n++; if(d.date < f.since) f.since = d.date });
   const farmers = Object.values(byF).sort((a, b) => b.left - a.left);
-  $('#dpKRunning').textContent = rp(sum(open, 'left'));
+  animateNum(['dpKRunning'], sum(open, 'left'), rp);
   $('#dpKRunningInfo').textContent = farmers.length + ' petani belum kirim barang';
-  $('#dpKTotal').textContent = rp(sum(rows, 'amount')); $('#dpKCount').textContent = rows.length + ' transaksi';
-  $('#dpKUsed').textContent = rp(sum(rows, 'used'));
-  $('#dpFarmerTable').innerHTML = farmers.map(f => `<tr><td data-label="Petani">${esc(f.name)}</td><td data-label="DP Berjalan">${rp(f.left)}</td><td data-label="Jumlah DP">${f.n}</td><td data-label="Sejak">${fmtDate(f.since)}</td></tr>`).join('') || empty(4);
+  animateNum(['dpKTotal'], sum(rows, 'amount'), rp); $('#dpKCount').textContent = rows.length + ' transaksi';
+  animateNum(['dpKUsed'], sum(rows, 'used'), rp);
+  $('#dpFarmerTable').innerHTML = farmers.map(f => `<tr><td data-label="Petani">${esc(f.name)}</td><td data-label="DP Berjalan">${rp(f.left)}</td><td data-label="Jumlah DP">${f.n}</td><td data-label="Sejak">${fmtDate(f.since)}</td></tr>`).join('') || `<tr><td colspan="4"><div class="dp-empty"><svg viewBox="0 0 84 84"><g transform="translate(42 42)"><g class="dp-coin"><circle r="28" fill="#D4A02E" stroke="#B8871F" stroke-width="4"/><path d="M-12 0l8 9 16-18" fill="none" stroke="#7A5A12" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg><b>Tidak ada DP berjalan</b><small>Semua uang muka sudah terlunasi dari bahan baku.</small></div></td></tr>`;
 
   const flt = $('#dpFilter').value, st = d => d.used === 0 ? ['Belum ada barang', '#F59E0B'] : d.left > 0 ? ['Sebagian', '#38BDF8'] : ['Lunas', '#22C55E'];
   $('#dpTable').innerHTML = rows.filter(d => flt === 'all' || (flt === 'open' ? d.left > 0 : d.left === 0)).sort(dpByDate).map(d => { const [t, c] = st(d);
-    return `<tr><td data-label="Tanggal">${fmtDate(d.date)}</td><td data-label="Petani">${esc(d.farmer)}</td><td data-label="Keterangan">${esc(d.note || '-')}</td><td data-label="DP">${rp(d.amount)}</td><td data-label="Terpakai">${d.used ? rp(d.used) : '-'}</td><td data-label="Sisa">${rp(d.left)}</td><td data-label="Status"><span class="badge" style="background:${c}26;color:${c}">${t}</span></td><td data-label="Aksi"><button onclick="deleteDeposit('${d.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>` }).join('') || empty(8);
+    return `<tr><td data-label="Tanggal">${fmtDate(d.date)}</td><td data-label="Petani">${esc(d.farmer)}</td><td data-label="Keterangan">${esc(d.note || '-')}</td><td data-label="DP">${rp(d.amount)}</td><td data-label="Terpakai">${d.used ? rp(d.used) : '-'}</td><td data-label="Sisa">${rp(d.left)}</td><td data-label="Status"><span class="badge${d.used === 0 ? ' dp-pulse' : ''}" style="background:${c}26;color:${c}">${t}</span></td><td data-label="Aksi"><button onclick="deleteDeposit('${d.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>` }).join('') || empty(8);
 
   const rawBy = new Map((S.raw || []).map(r => [String(r.id), r])), depBy = new Map(DP.list.map(d => [d.id, d]));
   $('#dpAllocTable').innerHTML = al.slice().sort(dpByDate).map(a => { const r = rawBy.get(a.rawId) || {}, d = depBy.get(a.depositId) || {};
@@ -116,6 +123,7 @@ render = function(){ _renderDepositHook(); try{ renderDeposits(); dpSchedule() }
   if(!ADMIN_PAGES.includes('deposits')) ADMIN_PAGES.push('deposits');   // halaman DP khusus admin
   $('#dpForm').onsubmit = addDeposit; $('#dpFilter').onchange = renderDeposits;
   const sup = document.querySelector('#rawForm [name=supplier]'); if(sup) sup.setAttribute('list', 'dpFarmerList');   // saran nama petani yang punya DP
+  $('#deposits').insertAdjacentHTML('afterbegin', dpHero('Uang Muka / DP Supplier', 'Catat DP ke petani, pantau yang belum kirim kelapa, dan lihat pelunasannya otomatis.', 'DP terpantau'));
   const f = $('#dpForm').date; if(f && !f.value) f.value = today;
   document.querySelectorAll('[data-page="deposits"],[data-go="deposits"]').forEach(b => b.addEventListener('click', () => setTimeout(() => { $('#title').textContent = 'Uang Muka / DP Supplier' }, 0)));
   await loadDeposits(); renderDeposits(); renderFinance(); dpSchedule();

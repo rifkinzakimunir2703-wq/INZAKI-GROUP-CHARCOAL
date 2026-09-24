@@ -15,6 +15,7 @@ function ensureFinanceUI(){
   if(!sec || sec.dataset.built) return;
   sec.dataset.built = '1';
   sec.innerHTML = `
+    ${typeof dpHero==='function'?dpHero('Keuangan &amp; Kas Perusahaan','Saldo kas, arus masuk-keluar, dan uang muka petani — semua terpantau di satu tempat.','Saldo real-time'):''}
     <div class="cards quick-glance" id="financeKpi">
       <div><span>Saldo Kas Saat Ini</span><b id="fkSaldo">Rp0</b></div>
       <div><span>Kas Masuk Bulan Ini</span><b id="fkMasukBulan">Rp0</b></div>

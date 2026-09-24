@@ -1,0 +1,31 @@
+/* Tampilan halaman Uang Muka / DP & Keuangan — animasi, kartu, ilustrasi */
+@keyframes dpRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes dpFloat{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-14px) rotate(6deg)}}
+@keyframes dpGlow{0%,100%{opacity:.10;transform:scale(1)}50%{opacity:.22;transform:scale(1.08)}}
+@keyframes dpPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}50%{box-shadow:0 0 0 6px rgba(245,158,11,0)}}
+@keyframes dpDrop{0%{transform:translateY(-30px);opacity:0}60%{opacity:1}100%{transform:translateY(0);opacity:1}}
+#deposits.active>*,#finance.active>*{animation:dpRise .55s cubic-bezier(.2,.7,.2,1) both}
+#deposits.active>*:nth-child(2),#finance.active>*:nth-child(2){animation-delay:.06s}
+#deposits.active>*:nth-child(3),#finance.active>*:nth-child(3){animation-delay:.12s}
+#deposits.active>*:nth-child(4),#finance.active>*:nth-child(4){animation-delay:.18s}
+#deposits.active>*:nth-child(n+5),#finance.active>*:nth-child(n+5){animation-delay:.24s}
+#deposits .hero,#finance .hero{margin-bottom:18px}
+.dp-glow{transform-box:fill-box;transform-origin:center;animation:dpGlow 4s ease-in-out infinite}
+.dp-coin{animation:dpFloat 3.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.dp-coin.d2{animation-delay:-1.2s}.dp-coin.d3{animation-delay:-2.2s}
+.dp-stack g{animation:dpDrop .7s both}.dp-stack g:nth-child(2){animation-delay:.15s}.dp-stack g:nth-child(3){animation-delay:.3s}.dp-stack g:nth-child(4){animation-delay:.45s}
+#deposits .cards>div,#finance .cards>div{position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s,border-color .25s}
+#deposits .cards>div::before,#finance .cards>div::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#22C55E,#38BDF8);opacity:.85}
+#deposits .cards>div.accent-amber::before{background:linear-gradient(90deg,#F59E0B,#FCD34D)}
+#deposits .cards>div:hover,#finance .cards>div:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(34,197,94,.14);border-color:rgba(34,197,94,.35)}
+#deposits .panel,#finance .panel{transition:border-color .25s,box-shadow .25s}
+#deposits .panel:hover,#finance .panel:hover{border-color:rgba(34,197,94,.25)}
+#deposits tbody tr,#finance tbody tr{transition:background .18s}
+#deposits tbody tr:hover,#finance tbody tr:hover{background:rgba(34,197,94,.07)}
+#deposits button.primary,#finance button.primary{transition:transform .15s,box-shadow .2s}
+#deposits button.primary:hover,#finance button.primary:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(34,197,94,.3)}
+#deposits button.primary:active,#finance button.primary:active{transform:scale(.98)}
+.dp-pulse{animation:dpPulse 2s infinite}
+.dp-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px 10px;color:#929a93;text-align:center}
+.dp-empty svg{width:84px;height:84px}.dp-empty .dp-coin{animation-duration:4s}
+@media (prefers-reduced-motion:reduce){#deposits *,#finance *,.dp-coin,.dp-glow,.dp-stack g,.dp-pulse{animation:none!important;transition:none!important}}
