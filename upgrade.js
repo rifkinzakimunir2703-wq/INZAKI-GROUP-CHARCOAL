@@ -16,3 +16,5 @@ for(const id in MAP){const b=document.querySelector('#'+id+'>.page-banner');if(b
 const hs=document.querySelector('#dashboard .hero svg');
 if(hs)hs.insertAdjacentHTML('beforeend',Array.from({length:9},(_,i)=>`<circle class="pb-tw" cx="${380+i*58}" cy="${30+(i*37)%110}" r="${1.6+(i%3)*.7}" fill="#F8DC85" style="animation-delay:${-i*.5}s"/>`).join(''));
 })();
+/* menu atas: tombol yang dipilih otomatis bergeser ke tengah layar (HP) */
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>setTimeout(()=>b.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}),60)));
