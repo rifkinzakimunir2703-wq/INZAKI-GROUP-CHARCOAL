@@ -23,11 +23,16 @@ function ensureFinanceUI(){
     </div>
 
     <div class="panel">
-      <div class="panel-head"><div><h2>Saldo Kas</h2><small>Catat kas masuk/keluar di luar transaksi otomatis — setor modal, tarik tunai, koreksi saldo</small></div></div>
-      <div class="saldo-actions">
-        <button type="button" class="ghost sa-add" id="saAdd">+ Tambah Kas</button>
-        <button type="button" class="ghost sa-sub" id="saSub">− Kurangi Kas</button>
-      </div>
+      <h2>Catat Transaksi Kas</h2>
+      <p class="hint">Untuk kas yang tidak berasal dari penjualan/pengeluaran/hutang otomatis — contoh: setor modal, tarik tunai (prive), koreksi saldo.</p>
+      <form id="financeForm" class="form">
+        <label>Tanggal<input type="date" name="date" required></label>
+        <label>Tipe<select name="type"><option value="in">Kas Masuk</option><option value="out">Kas Keluar</option></select></label>
+        <label>Kategori<select name="category"><option>Setor Modal</option><option>Tarik Tunai / Prive</option><option>Transfer Bank ke Kas</option><option>Transfer Kas ke Bank</option><option>Koreksi Saldo</option><option>Lainnya</option></select></label>
+        <label>Keterangan<input name="desc" placeholder="Contoh: Setor modal awal dari pemilik"></label>
+        <label>Jumlah (Rp)<input type="number" name="amount" min="0" required></label>
+        <button class="primary full">Simpan Transaksi</button>
+      </form>
     </div>
 
     <div class="panel chart-panel">
@@ -43,8 +48,7 @@ function ensureFinanceUI(){
       <table><thead><tr><th>Tanggal</th><th>Sumber</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th><th>AKSI</th></tr></thead><tbody id="financeLedgerTable"></tbody></table>
     </div>
   `;
-  $('#saAdd').onclick = () => quickCash('in');
-  $('#saSub').onclick = () => quickCash('out');
+  $('#financeForm').onsubmit = addFinance;
   $('#searchFinance').oninput = renderFinance;
 }
 
@@ -56,17 +60,16 @@ async function loadFinance(){
   FS.tx = (data||[]).map(mapFinance);
 }
 
-/* ---- Tambah/kurangi kas cepat lewat dialog jumlah ---- */
-async function quickCash(type){
-  if(!requireAdmin()) return;
-  const label = type==='in' ? 'Tambah Kas' : 'Kurangi Kas';
-  const val = await promptDialog(`Masukkan jumlah kas ${type==='in'?'masuk':'keluar'} (di luar transaksi otomatis)`, '', label);
-  if(val===null || val===undefined || val==='' || +val<=0) return;
-  const payload = { date: today, type, category: label+' (Manual)', desc: null, amount: +val };
+/* ---- Simpan transaksi kas manual dari form ---- */
+async function addFinance(e){
+  e.preventDefault(); if(!requireAdmin()) return;
+  let x = Object.fromEntries(new FormData(e.target));
+  if(+x.amount<=0) return toast('Jumlah harus lebih dari 0.');
+  const payload = { date:x.date, type:x.type, category:x.category, desc:x.desc||null, amount:+x.amount };
   const { data, error } = await sb.from('finance').insert(payload).select().single();
   if(error) return toast('Gagal simpan transaksi kas: '+error.message);
-  FS.tx.push(mapFinance(data)); renderFinance();
-  toast(type==='in' ? 'Kas berhasil ditambahkan.' : 'Kas berhasil dikurangi.');
+  FS.tx.push(mapFinance(data)); renderFinance(); e.target.reset(); e.target.date.value=today;
+  toast('Transaksi kas berhasil dicatat.');
 }
 
 /* ---- Hapus transaksi kas manual ---- */
