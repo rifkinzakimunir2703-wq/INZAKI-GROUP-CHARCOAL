@@ -87,9 +87,11 @@ async function deleteFinance(id){
 /* ---- Gabungkan semua sumber arus kas jadi satu buku kas dengan saldo berjalan ---- */
 function buildLedger(){
   let rows = [];
+  const dpBy = (typeof DP!=='undefined') ? DP.allocByRaw() : {}; // DP yang sudah memotong pembelian bahan baku
   (S.sales||[]).forEach(x => rows.push({ date:x.date, source:'Penjualan', auto:true, desc:(x.customer?x.customer+' — ':'')+(x.invoice?'#'+x.invoice:'Penjualan produk'), in:+x.total||0, out:0 }));
   (S.expenses||[]).forEach(x => rows.push({ date:x.date, source:'Pengeluaran', auto:true, desc:(x.cat||'')+(x.desc?': '+x.desc:''), in:0, out:+x.amount||0 }));
-  (S.raw||[]).forEach(r => rows.push({ date:r.date, source:'Pembelian Bahan Baku', auto:true, desc:(r.name||'')+(r.supplier?' — '+r.supplier:''), in:0, out:(+r.price||0)*(+r.originalQty||+r.qty||0)+(+r.transport||0)+(+r.other||0) }));
+  (S.raw||[]).forEach(r => { const dp=dpBy[String(r.id)]||0; rows.push({ date:r.date, source:'Pembelian Bahan Baku', auto:true, desc:(r.name||'')+(r.supplier?' — '+r.supplier:'')+(dp?' (lunas dari DP '+rp(dp)+')':''), in:0, out:Math.max(0,(+r.price||0)*(+r.originalQty||+r.qty||0)+(+r.transport||0)+(+r.other||0)-dp) }) });
+  (typeof DP!=='undefined'?DP.list:[]).forEach(d => rows.push({ date:d.date, source:'Uang Muka Supplier', auto:true, desc:'DP ke '+d.farmer+(d.note?' — '+d.note:''), in:0, out:+d.amount||0 }));
   (S.batches||[]).filter(isBuy).forEach(b => rows.push({ date:b.date, source:'Pembelian Barang Jadi', auto:true, desc:(b.code||'')+' — '+(b.productName||''), in:0, out:+b.totalHpp||0 }));
   (S.debts||[]).forEach(d => {
     rows.push({ date:d.date, source:'Penerimaan Hutang', auto:true, desc:'Pinjaman dari '+(d.creditor||'-'), in:+d.amount||0, out:0 });
