@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
 $$('input[type=date]').forEach(x=>x.value=today);
 
-let S={raw:[],batches:[],sales:[],expenses:[],debts:[],cash:[],cashOk:false};
+let S={raw:[],batches:[],sales:[],expenses:[],debts:[]};
 let isAdmin=false;
 const ADMIN_PAGES=['raw','batch','sales','expenses','debts','finance'];
 
@@ -124,7 +124,6 @@ const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.orig
 const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,productName:b.product_name||b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note,rawMaterialCost:b.raw_material_cost!=null?+b.raw_material_cost:null,rawTransportCost:b.raw_transport_cost!=null?+b.raw_transport_cost:null,rawOtherCost:b.raw_other_cost!=null?+b.raw_other_cost:null,lotCount:b.lot_count!=null?+b.lot_count:1,rawAllocations:b.raw_allocations?(typeof b.raw_allocations==='string'?JSON.parse(b.raw_allocations):b.raw_allocations):null});
 const mapSale=x=>({id:x.id,invoice:x.invoice_no||'',date:x.date,batchId:x.batch_id,customer:x.customer_name||x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status||'Lunas'});
 const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
-const mapCash=x=>({id:x.id,date:x.date,type:x.type,cat:x.cat,note:x.note||'',amount:+x.amount});
 const mapDebt=x=>({id:x.id,date:x.date,creditor:x.creditor,desc:x.desc,amount:+x.amount,dueDate:x.due_date,paidAmount:+x.paid_amount||0});
 
 /* ---- Sync badge & loading overlay ---- */
@@ -188,8 +187,6 @@ async function loadAll(){
     S[t.key]=(res.data||[]).map(t.map);
   });
 
-  /* Buku kas manual: tabel opsional, jika belum dibuat aplikasi tetap jalan */
-  try{const r=await withTimeout(sb.from('cashbook').select('*').order('id'),9000,'Memuat cashbook');S.cashOk=!r.error;S.cash=r.error?[]:(r.data||[]).map(mapCash)}catch(e){S.cashOk=false;S.cash=[]}
   setSync(hasError?'offline':'live');
   return !hasError;
 }
@@ -562,7 +559,7 @@ function renderBatchTable(){
   if(typeof reapplyTableFilters==='function')reapplyTableFilters();
 }
 ['batchFilterProduct','batchFilterPeriod','batchSort'].forEach(id=>{let el=document.getElementById(id);if(el)el.addEventListener('change',renderBatchTable)});
-const TABLE_SEARCH_MAP={searchRaw:'rawTable',searchBatch:'batchTable',searchSales:'salesTable',searchExpense:'expenseTable',searchDebt:'debtTable',searchFin:'finLedger'};
+const TABLE_SEARCH_MAP={searchRaw:'rawTable',searchBatch:'batchTable',searchSales:'salesTable',searchExpense:'expenseTable',searchDebt:'debtTable'};
 function filterTable(inputId,tbodyId){
   const input=$('#'+inputId),tbody=$('#'+tbodyId);
   if(!input||!tbody)return;
@@ -948,135 +945,83 @@ $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')}
 })();
 
 
-/* ================= KEUANGAN (buku kas) ================= */
-const FIN_CATS={in:['Penjualan kopra','Penjualan arang','Modal / suntikan dana','Lain-lain'],out:['Bahan baku','Upah tenaga kerja','Transportasi','Maintenance','Operasional','Lain-lain']};
-const FIN_COL=['#F5A524','#2DD4CF','#A78BFA','#F76E7E','#22C55E','#8E9A8B'];
-let finFilter='all',cashChart=null;
-/* Hook render dipasang di awal blok ini supaya tetap aktif walau ada error di bawah */
-const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}try{renderDashExtra()}catch(err){console.error('Statistik:',err)}};
-const _go=go;go=function(p){_go(p);if(p==='finance'&&cashChart)setTimeout(()=>cashChart.resize(),80)};
-
-function setFinType(t){const f=$('#cashForm');if(!f)return;f.type.value=t;$('#finType').classList.toggle('out',t==='out');$$('#finType button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));f.cat.innerHTML=FIN_CATS[t].map(c=>`<option>${c}</option>`).join('')}
-function ledgerRows(){
-  const r=[];
-  S.sales.filter(x=>x.status==='Lunas').forEach(x=>r.push({date:x.date,type:'in',cat:'Penjualan',note:`${x.invoice||'-'} · ${x.customer||''}`,amount:x.total,auto:true}));
-  S.expenses.forEach(x=>r.push({date:x.date,type:'out',cat:x.cat,note:x.desc,amount:x.amount,auto:true}));
-  S.cash.forEach(x=>r.push({...x,auto:false}));
-  return r.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+/* ---- Statistik per lini & hasil dari kelapa (dashboard) — filter: Semua / Terbaru / Bulan ini / Per tanggal, tampilan: Ringkasan / Riwayat per tanggal ---- */
+var dsState;
+function dsGet(){return dsState||(dsState={mode:'all',view:'summary',date:''})}
+const dsD=d=>String(d||'').slice(0,10);
+function dsLatest(){let m='';S.batches.forEach(b=>{const d=dsD(b.date);if(d>m)m=d});return m}
+function dsPeriod(){
+  const ds=dsGet();
+  if(ds.mode==='latest'){const d=dsLatest();return{test:x=>!!d&&dsD(x)===d,label:d?'Produksi terbaru: '+fmtDate(d):'Belum ada batch'}}
+  if(ds.mode==='month')return{test:x=>thisMonth(x),label:'Bulan ini'};
+  if(ds.mode==='date'){const d=ds.date;return{test:x=>!!d&&dsD(x)===d,label:d?'Tanggal: '+fmtDate(d):'Pilih tanggal'}}
+  return{test:()=>true,label:'Seluruh data'};
 }
-function renderFinance(){
-  if(!$('#finLedger'))return;
-  const L=ledgerRows(),sum=(a,t)=>a.filter(x=>x.type===t).reduce((s,x)=>s+x.amount,0),M=L.filter(x=>thisMonth(x.date)&&x.cat!=='Penyesuaian saldo');
-  const inAll=sum(L,'in'),outAll=sum(L,'out'),inM=sum(M,'in'),outM=sum(M,'out');
-  $('#fSaldo').textContent=rp(inAll-outAll);$('#fSaldo').className=inAll-outAll<0?'neg':'';
-  $('#fIn').textContent=rp(inM);$('#fInN').textContent=M.filter(x=>x.type==='in').length+' transaksi';
-  $('#fOut').textContent=rp(outM);$('#fOutN').textContent=M.filter(x=>x.type==='out').length+' transaksi';
-  $('#fMargin').textContent=(inM?((inM-outM)/inM*100).toFixed(1).replace('.',','):'0')+'%';
-  const setup=$('#finSetup');if(setup)setup.hidden=S.cashOk;
-  /* grafik 6 bulan */
-  const n=new Date(),ms=[],lb=[];
-  for(let i=5;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth()-i,1);ms.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));lb.push(d.toLocaleDateString('id-ID',{month:'short'}))}
-  const by=t=>ms.map(m=>L.filter(x=>x.type===t&&x.cat!=='Penyesuaian saldo'&&String(x.date).slice(0,7)===m).reduce((s,x)=>s+x.amount,0));
-  if(!cashChart&&window.Chart&&$('#cashChart')){
-    cashChart=new Chart($('#cashChart'),{type:'bar',data:{labels:lb,datasets:[{label:'Pemasukan',data:by('in'),backgroundColor:'#22C55E',borderRadius:6},{label:'Pengeluaran',data:by('out'),backgroundColor:'#F76E7E',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8E9A8B'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+rp(c.parsed.y)}}},scales:{y:{ticks:{color:'#8E9A8B',callback:v=>(v/1e6)+' jt'},grid:{color:'rgba(255,255,255,.07)'}},x:{ticks:{color:'#8E9A8B'},grid:{display:false}}}}});
-  }else if(cashChart){cashChart.data.labels=lb;cashChart.data.datasets[0].data=by('in');cashChart.data.datasets[1].data=by('out');cashChart.update()}
-  /* pengeluaran per kategori (bulan ini) */
-  const cat={};M.filter(x=>x.type==='out').forEach(x=>cat[x.cat]=(cat[x.cat]||0)+x.amount);
-  const ent=Object.entries(cat).sort((a,b)=>b[1]-a[1]),mx=Math.max(1,...ent.map(e=>e[1]));
-  $('#finCatBars').innerHTML=ent.map(([k,v],i)=>`<div class="cat-row"><div><b>${esc(k)}</b><span>${rp(v)}</span></div><div class="cat-track"><div class="cat-fill" style="width:${v/mx*100}%;background:${FIN_COL[i%FIN_COL.length]}"></div></div></div>`).join('')||'<p class="hint">Belum ada pengeluaran bulan ini.</p>';
-  /* buku kas */
-  $('#finLedger').innerHTML=L.filter(x=>finFilter==='all'||x.type===finFilter).slice(0,300).map(x=>`<tr><td data-label="Tanggal">${fmtDate(x.date)}</td><td data-label="Kategori"><span class="badge ${x.type==='in'?'badge-ok':'badge-pending'}">${esc(x.cat)}</span></td><td data-label="Keterangan">${esc(x.note)}</td><td data-label="Jumlah" class="${x.type==='in'?'amt-in':'amt-out'}">${x.type==='in'?'+':'-'}${rp(x.amount)}</td><td data-label="Sumber">${x.auto?'<span class="src-auto">Otomatis</span>':`<button onclick="deleteCash('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button>`}</td></tr>`).join('')||empty(5);
+function dsBar(label){
+  const ds=dsGet(),chips=(kind,list,cur,attr)=>`<div class="chips" data-ds="${kind}">${list.map(([k,t])=>`<button type="button" data-${attr}="${k}" class="${cur===k?'on':''}">${t}</button>`).join('')}</div>`;
+  return `<div class="ds-bar">${chips('mode',[['all','Semua'],['latest','Terbaru'],['month','Bulan ini'],['date','Per tanggal']],ds.mode,'m')}${ds.mode==='date'?`<input type="date" class="ds-date" value="${esc(ds.date)}">`:''}${chips('view',[['summary','Ringkasan'],['daily','Riwayat per tanggal']],ds.view,'v')}<small class="ds-info">Menampilkan: ${esc(label)}</small></div>`;
 }
-async function deleteCash(id){
-  if(!requireAdmin())return;
-  const c=S.cash.find(x=>String(x.id)===String(id));if(!c)return toast('Data tidak ditemukan!');
-  if(!await confirmDialog(`Hapus transaksi kas?\n\nTanggal: ${c.date}\nKategori: ${c.cat}\nJumlah: ${rp(c.amount)}\n\nData akan dihapus permanen!`))return;
-  const {data,error}=await sb.from('cashbook').delete().eq('id',c.id).select('id');
-  if(error)return toast('Gagal hapus: '+error.message);
-  if(!data||!data.length)return toast('Data tidak terhapus di server. Periksa kebijakan (RLS) DELETE tabel cashbook.');
-  S.cash=S.cash.filter(x=>String(x.id)!==String(id));render();toast('✅ Transaksi kas dihapus.');
-}
-if($('#cashForm')){
-  $('#cashForm').onsubmit=async e=>{
-    e.preventDefault();if(!requireAdmin())return;
-    const x=Object.fromEntries(new FormData(e.target)),amount=+x.amount;
-    if(!(amount>0))return toast('Jumlah harus lebih dari 0.');
-    if(!S.cashOk)return toast('Tabel cashbook belum dibuat. Jalankan keuangan.sql di Supabase (SQL Editor).');
-    const {data,error}=await sb.from('cashbook').insert({date:x.date,type:x.type,cat:x.cat,note:x.note||null,amount}).select().single();
-    if(error)return toast('Gagal simpan: '+error.message);
-    S.cash.push(mapCash(data));render();e.target.reset();e.target.date.value=today;setFinType('in');
-    toast('✅ Transaksi keuangan tersimpan.');
-  };
-  $('#finType').onclick=e=>{const b=e.target.closest('button');if(b)setFinType(b.dataset.t)};
-  $('#finFilter').onclick=e=>{const b=e.target.closest('button');if(!b)return;finFilter=b.dataset.f;$$('#finFilter button').forEach(x=>x.classList.toggle('on',x===b));renderFinance()};
-  setFinType('in');
-}
-
-/* ---- Tambah / kurangi saldo kas: form (modal) seperti pencatatan bahan baku & produksi. Dicatat di buku kas sebagai "Penyesuaian saldo" ---- */
-function closeSaldoModal(){const m=$('#saldoModal');if(m)m.classList.remove('show')}
-function openSaldoModal(t){
-  if(!requireAdmin())return;
-  const m=$('#saldoModal'),f=$('#saldoForm');
-  if(!m||!f)return toast('Form saldo tidak ditemukan. Pastikan index.html sudah diperbarui.');
-  f.reset();f.elements.type.value=t;f.elements.date.value=today;
-  $('#saldoTitle').textContent=t==='in'?'Tambah Saldo Kas':'Kurangi Saldo Kas';
-  $('#saldoHint').textContent=t==='in'?'Saldo kas akan bertambah dan tercatat di Buku Kas.':'Saldo kas akan berkurang dan tercatat di Buku Kas.';
-  const b2=$('#saldoSubmit');b2.textContent=t==='in'?'Simpan penambahan':'Simpan pengurangan';b2.className=(t==='in'?'primary':'danger')+' full';b2.disabled=false;
-  $('#saldoError').textContent='';
-  m.classList.add('show');setTimeout(()=>f.elements.amount.focus(),60);
-}
-async function submitSaldo(e){
-  e.preventDefault();
-  if(!requireAdmin())return;
-  const f=e.target,t=f.elements.type.value,amount=Math.round(+f.elements.amount.value),err=$('#saldoError'),btn=$('#saldoSubmit');
-  err.textContent='';
-  if(!(amount>0)){err.textContent='Jumlah harus lebih dari 0.';return}
-  if(!sb){err.textContent='Supabase belum dikonfigurasi.';return}
-  const note=(f.elements.note.value||'').trim()||(t==='in'?'Tambah saldo manual':'Kurangi saldo manual');
-  btn.disabled=true;const old=btn.textContent;btn.textContent='Menyimpan...';
-  try{
-    const {data,error}=await sb.from('cashbook').insert({date:f.elements.date.value||today,type:t,cat:'Penyesuaian saldo',note,amount}).select().single();
-    if(error){
-      const m=error.message||'';
-      err.textContent='Gagal simpan: '+m+(/relation|does not exist|schema cache/i.test(m)?' — jalankan keuangan.sql di Supabase (SQL Editor).':(/row-level|policy|permission/i.test(m)?' — tambahkan kebijakan (RLS) INSERT untuk pengguna login pada tabel cashbook.':''));
-      return;
-    }
-    S.cash.push(mapCash(data));S.cashOk=true;
-    closeSaldoModal();render();
-    toast(`✅ Saldo kas ${t==='in'?'ditambah':'dikurangi'} ${rp(amount)}.`);
-  }catch(ex){err.textContent='Gagal simpan: '+((ex&&ex.message)||ex)}
-  finally{btn.disabled=false;btn.textContent=old}
-}
-/* delegasi event (capture) supaya tombol selalu berfungsi */
 document.addEventListener('click',e=>{
-  const el=e.target&&e.target.closest?e.target.closest('#saldoAdd,#saldoSub,#saldoCancel,#saldoModal'):null;
-  if(!el)return;
-  if(el.id==='saldoAdd'){e.preventDefault();e.stopImmediatePropagation();openSaldoModal('in')}
-  else if(el.id==='saldoSub'){e.preventDefault();e.stopImmediatePropagation();openSaldoModal('out')}
-  else if(el.id==='saldoCancel'){e.preventDefault();closeSaldoModal()}
-  else if(el.id==='saldoModal'&&e.target===el){closeSaldoModal()}
-},true);
-document.addEventListener('submit',e=>{if(e.target&&e.target.id==='saldoForm'){e.stopImmediatePropagation();submitSaldo(e)}},true);
-
-/* ---- Statistik per lini & hasil dari kelapa (dashboard utama) ---- */
+  const b=e.target&&e.target.closest?e.target.closest('.ds-bar .chips button'):null;if(!b)return;
+  const ds=dsGet(),kind=b.parentElement.dataset.ds;
+  if(kind==='mode'){ds.mode=b.dataset.m;if(ds.mode==='date'&&!ds.date)ds.date=dsLatest()||today}
+  else ds.view=b.dataset.v;
+  try{renderDashExtra()}catch(err){console.error('Statistik:',err)}
+});
+document.addEventListener('change',e=>{
+  if(e.target&&e.target.classList&&e.target.classList.contains('ds-date')){const ds=dsGet();ds.date=e.target.value;ds.mode='date';try{renderDashExtra()}catch(err){console.error('Statistik:',err)}}
+});
 function renderDashExtra(){
   if(!$('#lineTable'))return;
+  const ds=dsGet(),P=dsPeriod(),daily=ds.view==='daily';
   const isB=n=>/batok|tempurung/i.test(n||''),isK=n=>/kelapa/i.test(n||'')&&!isB(n),f1=v=>v.toFixed(1).replace('.',','),sm=(arr,k)=>arr.reduce((s,x)=>s+(+x[k]||0),0);
-  const lines={};S.batches.forEach(b=>{const k=(b.rawName||'?')+'→'+(b.productName||'?');(lines[k]=lines[k]||{raw:b.rawName,prod:b.productName,b:[]}).b.push(b)});
-  $('#lineTable').innerHTML=Object.values(lines).map(l=>{
-    const inp=sm(l.b,'input'),out=sm(l.b,'output'),loss=inp-out,hpp=sm(l.b,'totalHpp'),ys=l.b.map(b=>b.input?b.output/b.input*100:0),avg=ys.reduce((s,v)=>s+v,0)/ys.length;
-    return `<tr><td data-label="Lini"><b>${esc(l.raw)} → ${esc(l.prod)}</b></td><td data-label="Batch">${l.b.length}</td><td data-label="Bahan masuk">${kg(inp)}</td><td data-label="Hasil">${kg(out)}</td><td data-label="Susut">${kg(loss)} (${f1(inp?loss/inp*100:0)}%)</td><td data-label="Rata² rendemen"><b>${f1(avg)}%</b></td><td data-label="Rendemen total">${f1(inp?out/inp*100:0)}%</td><td data-label="HPP/kg">${rp(out?hpp/out:0)}</td></tr>`}).join('')||empty(8);
-  const kb=S.batches.filter(b=>isK(b.rawName)),bb=S.batches.filter(b=>isB(b.rawName));
-  const stokK=S.raw.filter(r=>isK(r.name)).reduce((s,r)=>s+r.qty,0),stokB=S.raw.filter(r=>isB(r.name)).reduce((s,r)=>s+r.qty,0);
-  const procK=sm(kb,'input'),kopra=sm(kb,'output'),procB=sm(bb,'input'),arang=sm(bb,'output');
-  const dibeli=stokK+procK,batok=stokB+procB,base=procK||dibeli;
-  const el=$('#kelapaYield');
-  if(!el)return;
-  if(!dibeli){el.innerHTML='<p class="hint">Belum ada data kelapa. Catat pembelian kelapa di menu Bahan Baku dan hasil produksinya di menu Batch.</p>';return}
-  const kp=base?kopra/base*100:0,bp=base?batok/base*100:0,lain=Math.max(0,100-kp-bp);
-  el.innerHTML=`<div class="cards yield-cards"><div><span>Kelapa dibeli</span><b>${kg(dibeli)}</b><small>${kg(procK)} sudah diproses · ${kg(stokK)} masih stok</small></div><div class="accent-green"><span>Kopra dihasilkan</span><b>${kg(kopra)}</b><small>${f1(kp)}% dari kelapa diproses</small></div><div class="accent-amber"><span>Batok kelapa dihasilkan</span><b>${kg(batok)}</b><small>${f1(bp)}% dari kelapa diproses</small></div><div><span>Arang dari batok</span><b>${kg(arang)}</b><small>${procB?f1(arang/procB*100)+'% dari batok diproses':'Batok belum diproses'}</small></div></div>
+  const bar=dsBar(P.label);
+  ['dsBarKelapa','dsBarLine'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=bar});
+  const bs=S.batches.filter(b=>P.test(b.date));
+
+  /* ---- Statistik per lini ---- */
+  const groupLines=arr=>{const L={};arr.forEach(b=>{const k=(b.rawName||'?')+'→'+(b.productName||'?');(L[k]=L[k]||{raw:b.rawName,prod:b.productName,b:[]}).b.push(b)});return Object.values(L)};
+  const lineRow=(l,dateCell)=>{
+    const inp=sm(l.b,'input'),out=sm(l.b,'output'),loss=inp-out,hpp=sm(l.b,'totalHpp'),avg=l.b.reduce((s,b)=>s+(b.input?b.output/b.input*100:0),0)/l.b.length;
+    return `<tr>${dateCell?`<td data-label="Tanggal"><b>${dateCell}</b></td>`:''}<td data-label="Lini"><b>${esc(l.raw)} → ${esc(l.prod)}</b></td><td data-label="Batch">${l.b.length}</td><td data-label="Bahan masuk">${kg(inp)}</td><td data-label="Hasil">${kg(out)}</td><td data-label="Susut">${kg(loss)} (${f1(inp?loss/inp*100:0)}%)</td><td data-label="Rata² rendemen"><b>${f1(avg)}%</b></td><td data-label="Rendemen total">${f1(inp?out/inp*100:0)}%</td><td data-label="HPP/kg">${rp(out?hpp/out:0)}</td></tr>`};
+  const cols=['Lini','Batch','Bahan masuk','Hasil','Susut','Rata² rendemen','Rendemen total','HPP/kg'];
+  if(daily)cols.unshift('Tanggal');
+  const head=$('#lineHead');if(head)head.innerHTML=cols.map(c=>`<th>${c}</th>`).join('');
+  let lineHtml;
+  if(!bs.length)lineHtml=`<tr><td colspan="${cols.length}" style="text-align:center;color:#929a93">Tidak ada batch produksi pada periode ini</td></tr>`;
+  else if(daily){
+    const dates=[...new Set(bs.map(b=>dsD(b.date)))].sort().reverse();
+    lineHtml=dates.map(d=>groupLines(bs.filter(b=>dsD(b.date)===d)).map(l=>lineRow(l,fmtDate(d))).join('')).join('');
+  }else lineHtml=groupLines(bs).map(l=>lineRow(l)).join('');
+  $('#lineTable').innerHTML=lineHtml;
+
+  /* ---- Hasil dari kelapa ---- */
+  const el=$('#kelapaYield');if(!el)return;
+  const kb=bs.filter(b=>isK(b.rawName)),bb=bs.filter(b=>isB(b.rawName));
+  const batokRaw=S.raw.filter(r=>isB(r.name)&&P.test(r.date)),rawQty=r=>+r.originalQty||+r.qty||0;
+  if(daily){
+    const dates=[...new Set([...kb,...bb].map(b=>dsD(b.date)).concat(batokRaw.map(r=>dsD(r.date))))].filter(Boolean).sort().reverse();
+    if(!dates.length){el.innerHTML='<p class="hint">Tidak ada data kelapa pada periode ini.</p>';return}
+    const rows=dates.map(d=>{
+      const k=kb.filter(b=>dsD(b.date)===d),o=bb.filter(b=>dsD(b.date)===d),pk=sm(k,'input'),kp=sm(k,'output'),bt=batokRaw.filter(r=>dsD(r.date)===d).reduce((s,r)=>s+rawQty(r),0),ar=sm(o,'output');
+      const kpp=pk?kp/pk*100:0,btp=pk?bt/pk*100:0;
+      return `<tr><td data-label="Tanggal"><b>${fmtDate(d)}</b></td><td data-label="Kelapa diproses">${kg(pk)}</td><td data-label="Kopra">${kg(kp)}</td><td data-label="Kopra %">${pk?f1(kpp)+'%':'—'}</td><td data-label="Batok kelapa">${kg(bt)}</td><td data-label="Batok %">${pk?f1(btp)+'%':'—'}</td><td data-label="Arang dari batok">${kg(ar)}</td><td data-label="Air &amp; susut">${pk?f1(Math.max(0,100-kpp-btp))+'%':'—'}</td></tr>`}).join('');
+    el.innerHTML=`<table><thead><tr><th>Tanggal</th><th>Kelapa diproses</th><th>Kopra</th><th>Kopra %</th><th>Batok kelapa</th><th>Batok %</th><th>Arang dari batok</th><th>Air &amp; susut</th></tr></thead><tbody>${rows}</tbody></table><p class="hint">Persentase dihitung terhadap kelapa yang diproses pada tanggal tersebut. Batok = yang dicatat di menu Bahan Baku pada tanggal itu.</p>`;
+    return;
+  }
+  const all=ds.mode==='all',procK=sm(kb,'input'),kopra=sm(kb,'output'),procB=sm(bb,'input'),arang=sm(bb,'output');
+  let dibeli,batok,labelK,subK;
+  if(all){
+    const stokK=S.raw.filter(r=>isK(r.name)).reduce((s,r)=>s+r.qty,0),stokB=S.raw.filter(r=>isB(r.name)).reduce((s,r)=>s+r.qty,0);
+    dibeli=stokK+procK;batok=stokB+procB;labelK='Kelapa dibeli';subK=`${kg(procK)} sudah diproses · ${kg(stokK)} masih stok`;
+  }else{dibeli=procK;batok=batokRaw.reduce((s,r)=>s+rawQty(r),0);labelK='Kelapa diproses';subK=P.label}
+  if(all?!dibeli:(!procK&&!batok&&!arang)){el.innerHTML=all?'<p class="hint">Belum ada data kelapa. Catat pembelian kelapa di menu Bahan Baku dan hasil produksinya di menu Batch.</p>':'<p class="hint">Tidak ada data kelapa pada periode ini.</p>';return}
+  const base=procK||(all?dibeli:0),kp=base?kopra/base*100:0,bp=base?batok/base*100:0,lain=Math.max(0,100-kp-bp);
+  el.innerHTML=`<div class="cards yield-cards"><div><span>${labelK}</span><b>${kg(dibeli)}</b><small>${subK}</small></div><div class="accent-green"><span>Kopra dihasilkan</span><b>${kg(kopra)}</b><small>${f1(kp)}% dari kelapa diproses</small></div><div class="accent-amber"><span>Batok kelapa dihasilkan</span><b>${kg(batok)}</b><small>${f1(bp)}% dari kelapa diproses</small></div><div><span>Arang dari batok</span><b>${kg(arang)}</b><small>${procB?f1(arang/procB*100)+'% dari batok diproses':'Batok belum diproses'}</small></div></div>
   <div class="ystack"><i style="width:${kp}%;background:#22C55E"></i><i style="width:${bp}%;background:#F5A524"></i><i style="width:${lain}%;background:#3A423C"></i></div>
   <div class="ylegend"><span><i style="background:#22C55E"></i>Kopra ${f1(kp)}%</span><span><i style="background:#F5A524"></i>Batok ${f1(bp)}%</span><span><i style="background:#3A423C"></i>Air &amp; susut ${f1(lain)}%</span></div>
-  <p class="hint">Rata-rata setiap <b>100 kg kelapa</b> menghasilkan sekitar <b>${f1(kp)} kg kopra</b> dan <b>${f1(bp)} kg batok kelapa</b>. Batok dihitung dari yang tercatat di menu Bahan Baku (stok + yang sudah dibuat arang).</p>`;
+  <p class="hint">Rata-rata setiap <b>100 kg kelapa</b> menghasilkan sekitar <b>${f1(kp)} kg kopra</b> dan <b>${f1(bp)} kg batok kelapa</b>. Batok dihitung dari yang tercatat di menu Bahan Baku.</p>`;
 }
+/* Hook render: statistik per lini (dashboard). Modul Keuangan mandiri ada di finance.js */
+const _render=render;render=function(){_render();try{renderDashExtra()}catch(err){console.error('Statistik:',err)}};
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));

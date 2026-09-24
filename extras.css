@@ -69,3 +69,9 @@ aside{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2
 .sa-add{color:var(--green)!important;border-color:rgba(34,197,94,.4)!important}.sa-sub{color:var(--red)!important;border-color:rgba(247,110,126,.4)!important}
 .ystack{display:flex;height:16px;border-radius:99px;overflow:hidden;background:var(--surface-3);margin:18px 0 10px}.ystack i{display:block;transition:width .8s cubic-bezier(.2,.7,.2,1)}
 .ylegend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--muted);margin-bottom:6px}.ylegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+
+/* filter periode statistik dashboard */
+.ds-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 14px}
+.ds-bar .chips{flex-wrap:wrap}
+.ds-date{background:var(--surface-2);border:1px solid var(--border);color:inherit;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px}
+.ds-info{color:var(--muted);font-size:12.5px;flex-basis:100%}

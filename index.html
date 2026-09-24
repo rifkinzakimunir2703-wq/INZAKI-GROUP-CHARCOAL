@@ -1,4 +1,4 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%2316A34A'/%3E%3Ctext x='20' y='27' font-family='Arial,sans-serif' font-weight='700' font-size='16' fill='%2304170B' text-anchor='middle'%3EIG%3C/text%3E%3C/svg%3E"><meta name="theme-color" content="#0A0D0B"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css?v=20260925"><link rel="stylesheet" href="extras.css?v=20260925"></head><body>
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>INZAKI GROUP</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='11' fill='%2316A34A'/%3E%3Ctext x='20' y='27' font-family='Arial,sans-serif' font-weight='700' font-size='16' fill='%2304170B' text-anchor='middle'%3EIG%3C/text%3E%3C/svg%3E"><meta name="theme-color" content="#0A0D0B"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css?v=20260925c"><link rel="stylesheet" href="extras.css?v=20260925c"></head><body>
 <div id="loadingOverlay" class="loading-overlay"><div class="loading-box"><div class="loading-logo"><span>IG</span></div><div class="loading-spinner"></div><p>Memuat data dashboard…</p></div></div>
 <div id="configBanner" class="config-banner"><div class="config-box"><h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="ic-inline"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> Supabase belum dikonfigurasi</h2><p>Buka file <code>config.js</code>, isi <code>SUPABASE_URL</code> dan <code>SUPABASE_ANON_KEY</code> dengan data project Supabase kamu, lalu jalankan <code>supabase-schema.sql</code> di SQL Editor. Panduan lengkap ada di <code>README.md</code>.</p></div></div>
 <div class="layout"><aside><div class="brand"><div class="logo"><span>IG</span></div><div class="brand-text"><b>INZAKI<i>GROUP</i></b><small>Business Dashboard</small></div></div><nav>
@@ -24,16 +24,6 @@
 </div>
 </div>
 
-<div class="section-block"><div class="section-label">Statistik per lini</div><div class="panel"><div class="panel-head"><div><h2>Susut &amp; rendemen per lini</h2><small>Rata² rendemen = rata-rata rendemen tiap batch · rendemen total = hasil ÷ bahan masuk</small></div></div><table><thead><tr><th>Lini</th><th>Batch</th><th>Bahan masuk</th><th>Hasil</th><th>Susut</th><th>Rata² rendemen</th><th>Rendemen total</th><th>HPP/kg</th></tr></thead><tbody id="lineTable"></tbody></table></div></div>
-<div class="section-block"><div class="section-label">Hasil dari kelapa</div><div class="panel"><div class="panel-head"><div><h2>Dari pembelian kelapa: kopra &amp; batok kelapa</h2><small>Berapa kg kopra dan batok yang dihasilkan dari kelapa yang dibeli</small></div></div><div id="kelapaYield"></div></div></div>
-<div class="section-block">
-<div class="section-label">Insight &amp; Rekomendasi</div>
-<div class="panel">
-<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan — hal yang paling perlu ditindaklanjuti hari ini</small></div></div>
-<div id="insightList" class="insight-list"></div>
-</div>
-</div>
-
 <div class="section-block">
 <div class="section-label">Stok Bahan Baku &amp; Barang Jadi</div>
 <div class="stock-grid-2">
@@ -48,6 +38,24 @@
 </div>
 </div>
 
+<div class="section-block"><div class="section-label">Hasil dari kelapa</div><div class="panel"><div class="panel-head"><div><h2>Dari pembelian kelapa: kopra &amp; batok kelapa</h2><small>Berapa kg kopra dan batok yang dihasilkan dari kelapa — lihat yang terbaru, bulan ini, atau per tanggal</small></div></div><div id="dsBarKelapa"></div><div id="kelapaYield"></div></div></div>
+<div class="section-block">
+<div class="section-label">Statistik Susut per Batch</div>
+<div class="panel batch-loss-panel">
+<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
+<div id="batchLossList" class="batch-loss-list"></div>
+</div>
+</div>
+
+<div class="section-block"><div class="section-label">Statistik per lini</div><div class="panel"><div class="panel-head"><div><h2>Susut &amp; rendemen per lini</h2><small>Rata² rendemen = rata-rata rendemen tiap batch · rendemen total = hasil ÷ bahan masuk</small></div></div><div id="dsBarLine"></div><table><thead><tr id="lineHead"></tr></thead><tbody id="lineTable"></tbody></table></div></div>
+<div class="section-block">
+<div class="section-label">Insight &amp; Rekomendasi</div>
+<div class="panel">
+<div class="panel-head"><div><h2>Insight &amp; Rekomendasi</h2><small>Ringkasan otomatis dari data produksi &amp; penjualan — hal yang paling perlu ditindaklanjuti hari ini</small></div></div>
+<div id="insightList" class="insight-list"></div>
+</div>
+</div>
+
 <div class="section-block">
 <div class="section-label">Statistik Produksi per Lini</div>
 <div id="lineStatsCards" class="line-stats-grid"></div>
@@ -56,11 +64,6 @@
 <div class="panel chart-panel">
 <div class="panel-head"><div><h2>Grafik Produksi</h2><small>Bahan baku masuk vs barang jadi per bulan</small></div></div>
 <canvas id="productionChart"></canvas>
-</div>
-
-<div class="panel batch-loss-panel">
-<div class="panel-head"><div><h2>Statistik Susut per Batch</h2><small>Persentase penyusutan &amp; untung/rugi tiap batch, terbaru lebih dulu</small></div><div id="susutTotal" class="susut-total"></div></div>
-<div id="batchLossList" class="batch-loss-list"></div>
 </div>
 
 <div class="panel bi-sim-panel">
@@ -218,13 +221,7 @@
 <button class="primary full">Simpan Hutang</button></form></div>
 <div class="panel"><div class="panel-head"><h2>Riwayat Hutang</h2><input type="text" id="searchDebt" class="table-search" placeholder="Cari kreditur…"></div><table><thead><tr><th>Tanggal</th><th>Kreditur</th><th>Keterangan</th><th>Jumlah</th><th>Terbayar</th><th>Sisa</th><th>Jatuh Tempo</th><th>Status</th><th>AKSI</th></tr></thead><tbody id="debtTable"></tbody></table></div></section>
 
-<section id="finance" class="page"><p class="hint" id="finSetup" hidden>Tabel <b>cashbook</b> belum dibuat di Supabase, jadi transaksi manual belum bisa disimpan. Buka Supabase → SQL Editor, lalu jalankan isi file <b>keuangan.sql</b>. Penjualan lunas dan pengeluaran tetap terbaca otomatis.</p>
-<div class="cards fin-kpis"><div class="accent-green"><span>Saldo kas</span><b id="fSaldo">Rp0</b><small>Total pemasukan dikurangi pengeluaran</small><div class="saldo-actions"><button type="button" class="ghost sa-add" id="saldoAdd">+ Tambah</button><button type="button" class="ghost sa-sub" id="saldoSub">− Kurangi</button></div></div><div><span>Pemasukan bulan ini</span><b class="pos" id="fIn">Rp0</b><small id="fInN"></small></div><div><span>Pengeluaran bulan ini</span><b class="neg" id="fOut">Rp0</b><small id="fOutN"></small></div><div class="accent-amber"><span>Margin bersih</span><b id="fMargin">0%</b><small>Dari pemasukan bulan ini</small></div></div>
-<div class="fin-grid"><div class="panel"><div class="panel-head"><div><h2>Catat transaksi</h2><small>Untuk pemasukan/pengeluaran di luar penjualan &amp; pengeluaran umum</small></div></div>
-<form id="cashForm" class="form fin-form"><input type="hidden" name="type" value="in"><div class="seg" id="finType"><button type="button" class="on" data-t="in">Pemasukan</button><button type="button" data-t="out">Pengeluaran</button></div><label>Kategori<select name="cat"></select></label><label>Jumlah (Rp)<input type="number" name="amount" min="1" required></label><label>Tanggal<input type="date" name="date" required></label><label>Keterangan<input name="note" placeholder="Contoh: Modal tambahan dari pemilik"></label><button class="primary full">Simpan transaksi</button></form></div>
-<div class="panel chart-panel"><div class="panel-head"><div><h2>Arus kas 6 bulan</h2><small>Pemasukan vs pengeluaran</small></div></div><canvas id="cashChart"></canvas></div></div>
-<div class="fin-grid b"><div class="panel"><div class="panel-head"><div><h2>Pengeluaran per kategori</h2><small>Bulan ini</small></div></div><div id="finCatBars"></div></div>
-<div class="panel"><div class="panel-head"><div><h2>Buku kas</h2><small>Penjualan lunas &amp; pengeluaran umum otomatis ikut tercatat</small></div><div class="chips" id="finFilter"><button class="on" data-f="all">Semua</button><button data-f="in">Masuk</button><button data-f="out">Keluar</button></div></div><input type="text" id="searchFin" class="table-search" placeholder="Cari kategori / keterangan…"><table><thead><tr><th>Tanggal</th><th>Kategori</th><th>Keterangan</th><th>Jumlah</th><th>Sumber</th></tr></thead><tbody id="finLedger"></tbody></table></div></div></section>
+<section id="finance" class="page"><!-- diisi oleh finance.js (modul Keuangan mandiri) --></section>
 
 <section id="reports" class="page">
 
@@ -288,9 +285,8 @@
 <button class="ghost full" id="loginCancel">Batal</button></div></div>
 <div id="confirmModal" class="modal"><div class="modalbox confirm-box"><h2 id="confirmTitle">Konfirmasi</h2><p id="confirmMsg" class="confirm-msg"></p><div class="confirm-actions"><button class="ghost" id="confirmCancel">Batal</button><button class="danger" id="confirmOk">Ya, Lanjutkan</button></div></div></div>
 <div id="promptModal" class="modal"><div class="modalbox confirm-box"><h2 id="promptTitle">Konfirmasi</h2><p id="promptMsg" class="confirm-msg"></p><input type="number" id="promptInput" class="full" min="0"><div class="confirm-actions"><button class="ghost" id="promptCancel">Batal</button><button class="primary" id="promptOk">Simpan</button></div></div></div>
-<div id="saldoModal" class="modal"><div class="modalbox"><h2 id="saldoTitle">Tambah Saldo Kas</h2><p class="hint" id="saldoHint"></p><form id="saldoForm" class="form"><input type="hidden" name="type" value="in"><label>Tanggal<input type="date" name="date" required></label><label>Jumlah (Rp)<input type="number" name="amount" min="1" step="1" inputmode="numeric" placeholder="Contoh: 1000000" required></label><label class="full">Keterangan<input name="note" placeholder="Contoh: Setoran modal / koreksi saldo"></label><p class="login-error" id="saldoError"></p><button class="primary full" id="saldoSubmit">Simpan</button></form><button type="button" class="ghost full" id="saldoCancel">Batal</button></div></div>
 <div id="toastStack" class="toast-stack" aria-live="polite"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="app.js?v=20260925"></script><script src="extras.js?v=20260925"></script></body></html>
+<script src="app.js?v=20260925c"></script><script src="finance.js?v=20260925c"></script><script src="extras.js?v=20260925c"></script></body></html>
