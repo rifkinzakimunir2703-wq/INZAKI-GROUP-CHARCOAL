@@ -952,6 +952,10 @@ $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')}
 const FIN_CATS={in:['Penjualan kopra','Penjualan arang','Modal / suntikan dana','Lain-lain'],out:['Bahan baku','Upah tenaga kerja','Transportasi','Maintenance','Operasional','Lain-lain']};
 const FIN_COL=['#F5A524','#2DD4CF','#A78BFA','#F76E7E','#22C55E','#8E9A8B'];
 let finFilter='all',cashChart=null;
+/* Hook render dipasang di awal blok ini supaya tetap aktif walau ada error di bawah */
+const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}try{renderDashExtra()}catch(err){console.error('Statistik:',err)}};
+const _go=go;go=function(p){_go(p);if(p==='finance'&&cashChart)setTimeout(()=>cashChart.resize(),80)};
+
 function setFinType(t){const f=$('#cashForm');if(!f)return;f.type.value=t;$('#finType').classList.toggle('out',t==='out');$$('#finType button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));f.cat.innerHTML=FIN_CATS[t].map(c=>`<option>${c}</option>`).join('')}
 function ledgerRows(){
   const r=[];
@@ -1008,19 +1012,51 @@ if($('#cashForm')){
   setFinType('in');
 }
 
-/* ---- Tambah / kurangi saldo kas (dicatat di buku kas sebagai "Penyesuaian saldo") ---- */
-async function adjustSaldo(t){
+/* ---- Tambah / kurangi saldo kas: form (modal) seperti pencatatan bahan baku & produksi. Dicatat di buku kas sebagai "Penyesuaian saldo" ---- */
+function closeSaldoModal(){const m=$('#saldoModal');if(m)m.classList.remove('show')}
+function openSaldoModal(t){
   if(!requireAdmin())return;
-  if(!S.cashOk)return toast('Tabel cashbook belum dibuat. Jalankan keuangan.sql di Supabase (SQL Editor).');
-  const v=await promptDialog(t==='in'?'Jumlah saldo yang ditambahkan (Rp):':'Jumlah saldo yang dikurangi (Rp):','',t==='in'?'Tambah saldo kas':'Kurangi saldo kas');
-  if(v===null)return;
-  const amount=Math.round(+String(v).replace(/\./g,'').replace(',','.').trim());
-  if(!(amount>0))return toast('Jumlah harus lebih dari 0.');
-  const {data,error}=await sb.from('cashbook').insert({date:today,type:t,cat:'Penyesuaian saldo',note:t==='in'?'Tambah saldo manual':'Kurangi saldo manual',amount}).select().single();
-  if(error)return toast('Gagal simpan: '+error.message);
-  S.cash.push(mapCash(data));render();toast(`✅ Saldo kas ${t==='in'?'ditambah':'dikurangi'} ${rp(amount)}.`);
+  const m=$('#saldoModal'),f=$('#saldoForm');
+  if(!m||!f)return toast('Form saldo tidak ditemukan. Pastikan index.html sudah diperbarui.');
+  f.reset();f.elements.type.value=t;f.elements.date.value=today;
+  $('#saldoTitle').textContent=t==='in'?'Tambah Saldo Kas':'Kurangi Saldo Kas';
+  $('#saldoHint').textContent=t==='in'?'Saldo kas akan bertambah dan tercatat di Buku Kas.':'Saldo kas akan berkurang dan tercatat di Buku Kas.';
+  const b2=$('#saldoSubmit');b2.textContent=t==='in'?'Simpan penambahan':'Simpan pengurangan';b2.className=(t==='in'?'primary':'danger')+' full';b2.disabled=false;
+  $('#saldoError').textContent='';
+  m.classList.add('show');setTimeout(()=>f.elements.amount.focus(),60);
 }
-if($('#saldoAdd')){$('#saldoAdd').onclick=()=>adjustSaldo('in');$('#saldoSub').onclick=()=>adjustSaldo('out')}
+async function submitSaldo(e){
+  e.preventDefault();
+  if(!requireAdmin())return;
+  const f=e.target,t=f.elements.type.value,amount=Math.round(+f.elements.amount.value),err=$('#saldoError'),btn=$('#saldoSubmit');
+  err.textContent='';
+  if(!(amount>0)){err.textContent='Jumlah harus lebih dari 0.';return}
+  if(!sb){err.textContent='Supabase belum dikonfigurasi.';return}
+  const note=(f.elements.note.value||'').trim()||(t==='in'?'Tambah saldo manual':'Kurangi saldo manual');
+  btn.disabled=true;const old=btn.textContent;btn.textContent='Menyimpan...';
+  try{
+    const {data,error}=await sb.from('cashbook').insert({date:f.elements.date.value||today,type:t,cat:'Penyesuaian saldo',note,amount}).select().single();
+    if(error){
+      const m=error.message||'';
+      err.textContent='Gagal simpan: '+m+(/relation|does not exist|schema cache/i.test(m)?' — jalankan keuangan.sql di Supabase (SQL Editor).':(/row-level|policy|permission/i.test(m)?' — tambahkan kebijakan (RLS) INSERT untuk pengguna login pada tabel cashbook.':''));
+      return;
+    }
+    S.cash.push(mapCash(data));S.cashOk=true;
+    closeSaldoModal();render();
+    toast(`✅ Saldo kas ${t==='in'?'ditambah':'dikurangi'} ${rp(amount)}.`);
+  }catch(ex){err.textContent='Gagal simpan: '+((ex&&ex.message)||ex)}
+  finally{btn.disabled=false;btn.textContent=old}
+}
+/* delegasi event (capture) supaya tombol selalu berfungsi */
+document.addEventListener('click',e=>{
+  const el=e.target&&e.target.closest?e.target.closest('#saldoAdd,#saldoSub,#saldoCancel,#saldoModal'):null;
+  if(!el)return;
+  if(el.id==='saldoAdd'){e.preventDefault();e.stopImmediatePropagation();openSaldoModal('in')}
+  else if(el.id==='saldoSub'){e.preventDefault();e.stopImmediatePropagation();openSaldoModal('out')}
+  else if(el.id==='saldoCancel'){e.preventDefault();closeSaldoModal()}
+  else if(el.id==='saldoModal'&&e.target===el){closeSaldoModal()}
+},true);
+document.addEventListener('submit',e=>{if(e.target&&e.target.id==='saldoForm'){e.stopImmediatePropagation();submitSaldo(e)}},true);
 
 /* ---- Statistik per lini & hasil dari kelapa (dashboard utama) ---- */
 function renderDashExtra(){
@@ -1035,6 +1071,7 @@ function renderDashExtra(){
   const procK=sm(kb,'input'),kopra=sm(kb,'output'),procB=sm(bb,'input'),arang=sm(bb,'output');
   const dibeli=stokK+procK,batok=stokB+procB,base=procK||dibeli;
   const el=$('#kelapaYield');
+  if(!el)return;
   if(!dibeli){el.innerHTML='<p class="hint">Belum ada data kelapa. Catat pembelian kelapa di menu Bahan Baku dan hasil produksinya di menu Batch.</p>';return}
   const kp=base?kopra/base*100:0,bp=base?batok/base*100:0,lain=Math.max(0,100-kp-bp);
   el.innerHTML=`<div class="cards yield-cards"><div><span>Kelapa dibeli</span><b>${kg(dibeli)}</b><small>${kg(procK)} sudah diproses · ${kg(stokK)} masih stok</small></div><div class="accent-green"><span>Kopra dihasilkan</span><b>${kg(kopra)}</b><small>${f1(kp)}% dari kelapa diproses</small></div><div class="accent-amber"><span>Batok kelapa dihasilkan</span><b>${kg(batok)}</b><small>${f1(bp)}% dari kelapa diproses</small></div><div><span>Arang dari batok</span><b>${kg(arang)}</b><small>${procB?f1(arang/procB*100)+'% dari batok diproses':'Batok belum diproses'}</small></div></div>
@@ -1042,6 +1079,4 @@ function renderDashExtra(){
   <div class="ylegend"><span><i style="background:#22C55E"></i>Kopra ${f1(kp)}%</span><span><i style="background:#F5A524"></i>Batok ${f1(bp)}%</span><span><i style="background:#3A423C"></i>Air &amp; susut ${f1(lain)}%</span></div>
   <p class="hint">Rata-rata setiap <b>100 kg kelapa</b> menghasilkan sekitar <b>${f1(kp)} kg kopra</b> dan <b>${f1(bp)} kg batok kelapa</b>. Batok dihitung dari yang tercatat di menu Bahan Baku (stok + yang sudah dibuat arang).</p>`;
 }
-const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}try{renderDashExtra()}catch(err){console.error('Statistik:',err)}};
-const _go=go;go=function(p){_go(p);if(p==='finance'&&cashChart)setTimeout(()=>cashChart.resize(),80)};
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
