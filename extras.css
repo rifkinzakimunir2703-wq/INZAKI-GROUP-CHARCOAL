@@ -1,0 +1,66 @@
+/* INZAKI GROUP — lapisan tambahan: ilustrasi, ikon, animasi, halaman Keuangan (tema gelap asli tetap di style.css) */
+.hero{position:relative;overflow:hidden;border-radius:18px;min-height:210px;margin-bottom:22px;color:#fff;display:flex;align-items:center;background:#0B1F17;border:1px solid var(--border)}
+.hero svg{position:absolute;inset:0;width:100%;height:100%}
+.hero::before{content:'';position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,#0B1F17 22%,rgba(11,31,23,.6) 48%,transparent 75%)}
+.hero-text{position:relative;z-index:2;padding:30px 36px;max-width:540px}
+.hero-text small{font-size:12.5px;font-weight:500;color:rgba(255,255,255,.7)}
+.hero-title{font:700 32px/1.1 var(--font-display);letter-spacing:-.025em;margin:6px 0 8px}
+.hero-text p{color:rgba(255,255,255,.8);font-size:14px;max-width:44ch;margin:0 0 14px}
+.hero-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 13px;border-radius:999px;background:rgba(255,255,255,.12);font-size:12.5px;font-weight:600}
+.hero-chip i{width:8px;height:8px;border-radius:50%;background:#22C55E;animation:pulse 2s infinite}
+.palm{transform-box:fill-box;transform-origin:50% 100%;animation:sway 5s ease-in-out infinite alternate}
+.crown{transform-box:fill-box;transform-origin:0 100%;animation:flutter 3.2s ease-in-out infinite alternate}
+.rays{animation:spin 40s linear infinite}.halo{animation:pulse2 4s ease-in-out infinite}
+.cloud.c1{animation:drift 22s ease-in-out infinite alternate}.cloud.c2{animation:drift 30s ease-in-out infinite alternate-reverse}
+.wave{animation:wave 6s ease-in-out infinite alternate}
+@keyframes sway{to{transform:rotate(2.5deg)}}@keyframes flutter{to{transform:rotate(-4deg) scale(1.02)}}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse2{50%{opacity:.4;transform:scale(1.15)}}
+@keyframes drift{to{transform:translateX(70px)}}@keyframes wave{to{transform:translateX(-40px)}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}50%{box-shadow:0 0 0 7px rgba(34,197,94,0)}}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes rowIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes bob{50%{transform:translateY(-4px) rotate(-4deg)}}
+@keyframes shine{to{background-position:-200% 0}}
+@keyframes flash{0%{background:var(--primary-soft)}100%{background:none}}
+
+/* animasi masuk hanya saat berpindah halaman (kelas .anim), agar tidak berkedip saat data sinkron */
+.page.anim{animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+.page.anim .hero,.page.anim .cards>div,.page.anim .panel,.page.anim .stock-card,.page.anim .line-card,.page.anim .insight-card,.page.anim .recent-item,.page.anim .batch-loss-card,.page.anim .flow-node,.page.anim .report>div,.page.anim .page-banner{animation:rise .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+.page.anim tbody tr{animation:rowIn .45s ease both;animation-delay:calc(var(--i,0)*45ms)}
+.page.anim .blc-bar-fill,.page.anim .loss-bar-in,.page.anim .cat-fill{transform-origin:left;animation:grow 1s cubic-bezier(.2,.7,.2,1) .3s both}
+.stock-card,.line-card,.batch-loss-card,.recent-item,nav button,.primary,.ghost{transition:transform .25s ease,border-color .25s,background .25s,box-shadow .25s}
+.stock-card:hover,.line-card:hover,.batch-loss-card:hover{transform:translateY(-4px);box-shadow:0 14px 28px -14px rgba(34,197,94,.35)}
+.stock-card:hover .ic,.line-card:hover .ic,.flow-node:hover .ic{animation:bob .6s ease}
+.recent-item:hover{transform:translateX(4px)}nav button:hover{transform:translateX(4px)}
+.primary:active,.ghost:active,.btn-delete:active{transform:scale(.96)}
+
+/* ikon & banner halaman */
+.ic{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:12px;background:var(--primary-soft);flex:none}
+.ic svg{width:32px;height:32px}
+.stock-card,.flow-node{position:relative}
+.stock-card .ic,.flow-node .ic{position:absolute;top:12px;right:12px}
+.line-card-head{align-items:center;gap:12px}.line-card-head .ic{order:-1}
+.page-banner{display:flex;align-items:center;gap:16px;padding:16px 20px;margin-bottom:18px;border:1px solid var(--border);border-radius:16px;background:linear-gradient(100deg,var(--primary-soft),rgba(245,165,36,.10),var(--primary-soft));background-size:200% 100%;animation:shine 9s linear infinite}
+.page-banner .ic{width:54px;height:54px;background:var(--surface-2);border:1px solid var(--border)}.page-banner .ic svg{width:38px;height:38px}
+.page-banner b{display:block;font:600 17px var(--font-display)}.page-banner small{color:var(--muted);font-size:13px}
+aside{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 230 150'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.08' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M40 150C48 115 38 80 46 45'/%3E%3Cpath d='M170 150C162 120 174 90 166 62'/%3E%3C/g%3E%3Cg fill='%23fff' fill-opacity='.08'%3E%3Cpath d='M46 45C30 30 12 34 2 46C20 40 34 42 46 45ZM46 45C62 30 80 34 90 46C72 40 58 42 46 45ZM46 45C44 28 52 12 66 6C58 18 52 30 46 45ZM166 62C150 47 132 51 122 63C140 57 154 59 166 62ZM166 62C182 47 200 51 210 63C192 57 178 59 166 62ZM166 62C164 45 172 29 186 23C178 35 172 47 166 62Z'/%3E%3C/g%3E%3C/svg%3E");background-repeat:no-repeat;background-position:bottom;background-size:100% auto}
+
+/* halaman Keuangan */
+.fin-grid{display:grid;grid-template-columns:minmax(300px,.85fr) 1.4fr;gap:18px;margin-top:18px}.fin-grid.b{grid-template-columns:1fr 1.5fr}
+.fin-kpis b{font-size:26px}
+.fin-form{display:grid!important;grid-template-columns:1fr!important;gap:14px;margin-top:6px}
+.seg{display:grid;grid-template-columns:1fr 1fr;padding:4px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px}
+.seg button{background:none;border:0;color:var(--muted);font:600 13px var(--font-body);padding:10px;border-radius:9px;cursor:pointer;transition:color .25s,background .25s}
+.seg button.on{background:var(--primary-soft);color:var(--primary)}
+.seg.out button.on{background:var(--red-soft);color:var(--red)}
+.chips{display:flex;gap:6px}.chips button{background:var(--surface-2);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:6px 13px;font:600 12px var(--font-body);cursor:pointer;transition:.2s}
+.chips button.on{background:var(--primary-soft);color:var(--primary);border-color:transparent}
+.cat-row{margin-bottom:14px}.cat-row>div:first-child{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}.cat-row span{color:var(--muted)}
+.cat-track{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden}.cat-fill{height:100%;border-radius:99px}
+.amt-in{color:var(--green);font-weight:600}.amt-out{color:var(--red);font-weight:600}.src-auto{color:var(--muted);font-size:12px}
+#finance .chart-panel canvas{height:250px!important}
+#finance .table-search{margin:0 0 12px;max-width:320px}
+@media(max-width:900px){.fin-grid,.fin-grid.b{grid-template-columns:1fr}aside{background-image:none}}
+@media(max-width:520px){.hero{min-height:230px}.hero::before{background:linear-gradient(180deg,#0B1F17 30%,rgba(11,31,23,.55))}.hero-text{padding:22px}.hero-title{font-size:25px}.page-banner{padding:12px 14px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

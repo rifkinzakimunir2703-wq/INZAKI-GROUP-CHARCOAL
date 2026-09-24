@@ -2,9 +2,9 @@
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s),today=new Date().toISOString().slice(0,10);
 $$('input[type=date]').forEach(x=>x.value=today);
 
-let S={raw:[],batches:[],sales:[],expenses:[],debts:[]};
+let S={raw:[],batches:[],sales:[],expenses:[],debts:[],cash:[],cashOk:false};
 let isAdmin=false;
-const ADMIN_PAGES=['raw','batch','sales','expenses','debts'];
+const ADMIN_PAGES=['raw','batch','sales','expenses','debts','finance'];
 
 /* ---- Icons (inline SVG, no external deps) ---- */
 const ICON={
@@ -124,6 +124,7 @@ const mapRaw=r=>({id:r.id,date:r.date,name:r.name,qty:+r.qty,originalQty:+r.orig
 const mapBatch=b=>({id:b.id,code:b.code,date:b.date,rawId:b.raw_id,rawName:b.raw_name,productName:b.product_name||b.raw_name,input:+b.input,output:+b.output,loss:+b.loss,lossPct:+b.loss_pct,totalHpp:+b.total_hpp,hppkg:+b.hpp_kg,labor:+b.labor,energy:+b.energy,other:+b.other,note:b.note,rawMaterialCost:b.raw_material_cost!=null?+b.raw_material_cost:null,rawTransportCost:b.raw_transport_cost!=null?+b.raw_transport_cost:null,rawOtherCost:b.raw_other_cost!=null?+b.raw_other_cost:null,lotCount:b.lot_count!=null?+b.lot_count:1,rawAllocations:b.raw_allocations?(typeof b.raw_allocations==='string'?JSON.parse(b.raw_allocations):b.raw_allocations):null});
 const mapSale=x=>({id:x.id,invoice:x.invoice_no||'',date:x.date,batchId:x.batch_id,customer:x.customer_name||x.customer,qty:+x.qty,price:+x.price,total:+x.total,status:x.status||'Lunas'});
 const mapExpense=x=>({id:x.id,date:x.date,cat:x.cat,desc:x.desc,amount:+x.amount});
+const mapCash=x=>({id:x.id,date:x.date,type:x.type,cat:x.cat,note:x.note||'',amount:+x.amount});
 const mapDebt=x=>({id:x.id,date:x.date,creditor:x.creditor,desc:x.desc,amount:+x.amount,dueDate:x.due_date,paidAmount:+x.paid_amount||0});
 
 /* ---- Sync badge & loading overlay ---- */
@@ -187,6 +188,8 @@ async function loadAll(){
     S[t.key]=(res.data||[]).map(t.map);
   });
 
+  /* Buku kas manual: tabel opsional, jika belum dibuat aplikasi tetap jalan */
+  try{const r=await withTimeout(sb.from('cashbook').select('*').order('id'),9000,'Memuat cashbook');S.cashOk=!r.error;S.cash=r.error?[]:(r.data||[]).map(mapCash)}catch(e){S.cashOk=false;S.cash=[]}
   setSync(hasError?'offline':'live');
   return !hasError;
 }
@@ -559,7 +562,7 @@ function renderBatchTable(){
   if(typeof reapplyTableFilters==='function')reapplyTableFilters();
 }
 ['batchFilterProduct','batchFilterPeriod','batchSort'].forEach(id=>{let el=document.getElementById(id);if(el)el.addEventListener('change',renderBatchTable)});
-const TABLE_SEARCH_MAP={searchRaw:'rawTable',searchBatch:'batchTable',searchSales:'salesTable',searchExpense:'expenseTable',searchDebt:'debtTable'};
+const TABLE_SEARCH_MAP={searchRaw:'rawTable',searchBatch:'batchTable',searchSales:'salesTable',searchExpense:'expenseTable',searchDebt:'debtTable',searchFin:'finLedger'};
 function filterTable(inputId,tbodyId){
   const input=$('#'+inputId),tbody=$('#'+tbodyId);
   if(!input||!tbody)return;
@@ -571,35 +574,43 @@ Object.entries(TABLE_SEARCH_MAP).forEach(([inputId,tbodyId])=>{const el=document
 
 /* ---- DELETE FUNCTIONS ---- */
 
-// Tandai penjualan piutang sebagai lunas
+// Tandai penjualan piutang sebagai lunas (seluruh baris invoice yang sama)
+function saleGroup(sale){return sale.invoice?S.sales.filter(x=>x.invoice===sale.invoice&&x.customer===sale.customer&&x.date===sale.date):[sale]}
 async function markSalePaid(id){
   if(!requireAdmin())return;
-  const sale=S.sales.find(x=>x.id===id);
+  const sale=S.sales.find(x=>String(x.id)===String(id));
   if(!sale)return toast('Data tidak ditemukan!');
-  if(!await confirmDialog(`Tandai lunas?\n\nInvoice: ${sale.invoice||'-'}\nPelanggan: ${sale.customer}\nTotal: ${rp(sale.total)}`))return;
-  const {error}=await sb.from('sales').update({status:'Lunas'}).eq('id',id);
+  const grp=saleGroup(sale),total=grp.reduce((a,x)=>a+x.total,0);
+  if(!await confirmDialog(`Tandai lunas?\n\nInvoice: ${sale.invoice||'-'}\nPelanggan: ${sale.customer}\nTotal: ${rp(total)}`))return;
+  const {data,error}=await sb.from('sales').update({status:'Lunas'}).in('id',grp.map(x=>x.id)).select('id');
   if(error)return toast('Gagal memperbarui status: '+error.message);
-  sale.status='Lunas';render();
+  if(!data||!data.length)return toast('Tidak ada data yang berubah. Periksa kebijakan (RLS) UPDATE untuk tabel sales di Supabase.');
+  grp.forEach(x=>x.status='Lunas');render();
   toast('✅ Penjualan ditandai lunas.');
 }
 
-// Hapus Penjualan
+// Hapus Penjualan / Piutang (satu invoice bisa terpecah ke beberapa baris batch)
 async function deleteSale(id) {
     if (!requireAdmin()) return;
-    const sale = S.sales.find(x => x.id === id);
+    const sale = S.sales.find(x => String(x.id) === String(id));
     if (!sale) return toast('Data tidak ditemukan!');
-    if (!await confirmDialog(`Hapus penjualan?\n\nTanggal: ${sale.date}\nPelanggan: ${sale.customer}\nQTY: ${sale.qty} kg\nTotal: ${rp(sale.total)}\n\nData akan dihapus permanen!`)) return;
-    const { error } = await sb.from('sales').delete().eq('id', id);
+    const grp = saleGroup(sale), total = grp.reduce((a,x)=>a+x.total,0), qty = grp.reduce((a,x)=>a+x.qty,0);
+    const info = grp.length>1 ? `\n\nInvoice ini terdiri dari ${grp.length} baris (dialokasikan ke beberapa batch). Semua baris ikut dihapus.` : '';
+    if (!await confirmDialog(`Hapus ${sale.status==='Piutang'?'piutang':'penjualan'}?\n\nInvoice: ${sale.invoice||'-'}\nTanggal: ${sale.date}\nPelanggan: ${sale.customer}\nQTY: ${qty} kg\nTotal: ${rp(total)}${info}\n\nData akan dihapus permanen!`)) return;
+    const ids = grp.map(x => x.id);
+    const { data, error } = await sb.from('sales').delete().in('id', ids).select('id');
     if (error) return toast('Gagal hapus: ' + error.message);
-    S.sales = S.sales.filter(x => x.id !== id);
+    if (!data || !data.length) return toast('Data tidak terhapus di server. Buka Supabase → tabel sales → tambahkan kebijakan (RLS) DELETE untuk pengguna login (lihat keuangan.sql).');
+    const gone = data.map(r => String(r.id));
+    S.sales = S.sales.filter(x => !gone.includes(String(x.id)));
     render();
-    toast('✅ Penjualan berhasil dihapus!');
+    toast('✅ ' + (sale.status==='Piutang'?'Piutang':'Penjualan') + ' berhasil dihapus!');
 }
 
 // Hapus Batch
 async function deleteBatch(id) {
     if (!requireAdmin()) return;
-    const batch = S.batches.find(x => x.id === id);
+    const batch = S.batches.find(x => String(x.id)===String(id));
     if (!batch) return toast('Data tidak ditemukan!');
     const hasSales = S.sales.some(x => x.batchId === id);
     if (hasSales) {
@@ -627,7 +638,7 @@ async function deleteBatch(id) {
     }
     const { error } = await sb.from('batches').delete().eq('id', id);
     if (error) return toast('Gagal hapus: ' + error.message);
-    S.batches = S.batches.filter(x => x.id !== id);
+    S.batches = S.batches.filter(x => String(x.id)!==String(id));
     render();
     toast('✅ Batch berhasil dihapus!');
 }
@@ -635,7 +646,7 @@ async function deleteBatch(id) {
 // Hapus Bahan Baku
 async function deleteRaw(id) {
     if (!requireAdmin()) return;
-    const raw = S.raw.find(x => x.id === id);
+    const raw = S.raw.find(x => String(x.id)===String(id));
     if (!raw) return toast('Data tidak ditemukan!');
     const usedInBatch = S.batches.some(x => x.rawId === id);
     if (usedInBatch) {
@@ -644,7 +655,7 @@ async function deleteRaw(id) {
     if (!await confirmDialog(`Hapus bahan baku?\n\nNama: ${raw.name}\nQTY: ${raw.qty} kg\n\nData akan dihapus permanen!`)) return;
     const { error } = await sb.from('raw_materials').delete().eq('id', id);
     if (error) return toast('Gagal hapus: ' + error.message);
-    S.raw = S.raw.filter(x => x.id !== id);
+    S.raw = S.raw.filter(x => String(x.id)!==String(id));
     render();
     toast('✅ Bahan baku berhasil dihapus!');
 }
@@ -652,18 +663,18 @@ async function deleteRaw(id) {
 // Hapus Pengeluaran
 async function deleteExpense(id) {
     if (!requireAdmin()) return;
-    const expense = S.expenses.find(x => x.id === id);
+    const expense = S.expenses.find(x => String(x.id)===String(id));
     if (!expense) return toast('Data tidak ditemukan!');
     if (!await confirmDialog(`Hapus pengeluaran?\n\nTanggal: ${expense.date}\nKategori: ${expense.cat}\nDeskripsi: ${expense.desc}\nJumlah: ${rp(expense.amount)}\n\nData akan dihapus permanen!`)) return;
     const { error } = await sb.from('expenses').delete().eq('id', id);
     if (error) return toast('Gagal hapus: ' + error.message);
-    S.expenses = S.expenses.filter(x => x.id !== id);
+    S.expenses = S.expenses.filter(x => String(x.id)!==String(id));
     render();
     toast('✅ Pengeluaran berhasil dihapus!');
 }
 
 /* ---- Navigation ---- */
-function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='finance'?'Keuangan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
 $('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
 $$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
@@ -822,7 +833,7 @@ $('#debtForm').onsubmit=async e=>{
 };
 async function payDebt(id){
   if(!requireAdmin())return;
-  const d=S.debts.find(x=>x.id===id);
+  const d=S.debts.find(x=>String(x.id)===String(id));
   if(!d)return toast('Data tidak ditemukan!');
   const sisa=debtRemaining(d);
   const input=await promptDialog(`Bayar hutang ke ${d.creditor}\nSisa: ${rp(sisa)}`,sisa,'Bayar Hutang');
@@ -838,12 +849,12 @@ async function payDebt(id){
 }
 async function deleteDebt(id){
   if(!requireAdmin())return;
-  const d=S.debts.find(x=>x.id===id);
+  const d=S.debts.find(x=>String(x.id)===String(id));
   if(!d)return toast('Data tidak ditemukan!');
   if(!await confirmDialog(`Hapus hutang?\n\nKreditur: ${d.creditor}\nJumlah: ${rp(d.amount)}\nTerbayar: ${rp(d.paidAmount)}\n\nData akan dihapus permanen!`))return;
   const {error}=await sb.from('debts').delete().eq('id',id);
   if(error)return toast('Gagal hapus: '+error.message);
-  S.debts=S.debts.filter(x=>x.id!==id);render();
+  S.debts=S.debts.filter(x=>String(x.id)!==String(id));render();
   toast('✅ Hutang berhasil dihapus!');
 }
 
@@ -935,3 +946,67 @@ $('#logoutBtn').onclick=async()=>{if(sb)await sb.auth.signOut();go('dashboard')}
     hideLoading();
   }
 })();
+
+
+/* ================= KEUANGAN (buku kas) ================= */
+const FIN_CATS={in:['Penjualan kopra','Penjualan arang','Modal / suntikan dana','Lain-lain'],out:['Bahan baku','Upah tenaga kerja','Transportasi','Maintenance','Operasional','Lain-lain']};
+const FIN_COL=['#F5A524','#2DD4CF','#A78BFA','#F76E7E','#22C55E','#8E9A8B'];
+let finFilter='all',cashChart=null;
+function setFinType(t){const f=$('#cashForm');if(!f)return;f.type.value=t;$('#finType').classList.toggle('out',t==='out');$$('#finType button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));f.cat.innerHTML=FIN_CATS[t].map(c=>`<option>${c}</option>`).join('')}
+function ledgerRows(){
+  const r=[];
+  S.sales.filter(x=>x.status==='Lunas').forEach(x=>r.push({date:x.date,type:'in',cat:'Penjualan',note:`${x.invoice||'-'} · ${x.customer||''}`,amount:x.total,auto:true}));
+  S.expenses.forEach(x=>r.push({date:x.date,type:'out',cat:x.cat,note:x.desc,amount:x.amount,auto:true}));
+  S.cash.forEach(x=>r.push({...x,auto:false}));
+  return r.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+}
+function renderFinance(){
+  if(!$('#finLedger'))return;
+  const L=ledgerRows(),sum=(a,t)=>a.filter(x=>x.type===t).reduce((s,x)=>s+x.amount,0),M=L.filter(x=>thisMonth(x.date));
+  const inAll=sum(L,'in'),outAll=sum(L,'out'),inM=sum(M,'in'),outM=sum(M,'out');
+  $('#fSaldo').textContent=rp(inAll-outAll);$('#fSaldo').className=inAll-outAll<0?'neg':'';
+  $('#fIn').textContent=rp(inM);$('#fInN').textContent=M.filter(x=>x.type==='in').length+' transaksi';
+  $('#fOut').textContent=rp(outM);$('#fOutN').textContent=M.filter(x=>x.type==='out').length+' transaksi';
+  $('#fMargin').textContent=(inM?((inM-outM)/inM*100).toFixed(1).replace('.',','):'0')+'%';
+  const setup=$('#finSetup');if(setup)setup.hidden=S.cashOk;
+  /* grafik 6 bulan */
+  const n=new Date(),ms=[],lb=[];
+  for(let i=5;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth()-i,1);ms.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));lb.push(d.toLocaleDateString('id-ID',{month:'short'}))}
+  const by=t=>ms.map(m=>L.filter(x=>x.type===t&&String(x.date).slice(0,7)===m).reduce((s,x)=>s+x.amount,0));
+  if(!cashChart&&window.Chart&&$('#cashChart')){
+    cashChart=new Chart($('#cashChart'),{type:'bar',data:{labels:lb,datasets:[{label:'Pemasukan',data:by('in'),backgroundColor:'#22C55E',borderRadius:6},{label:'Pengeluaran',data:by('out'),backgroundColor:'#F76E7E',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8E9A8B'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+rp(c.parsed.y)}}},scales:{y:{ticks:{color:'#8E9A8B',callback:v=>(v/1e6)+' jt'},grid:{color:'rgba(255,255,255,.07)'}},x:{ticks:{color:'#8E9A8B'},grid:{display:false}}}}});
+  }else if(cashChart){cashChart.data.labels=lb;cashChart.data.datasets[0].data=by('in');cashChart.data.datasets[1].data=by('out');cashChart.update()}
+  /* pengeluaran per kategori (bulan ini) */
+  const cat={};M.filter(x=>x.type==='out').forEach(x=>cat[x.cat]=(cat[x.cat]||0)+x.amount);
+  const ent=Object.entries(cat).sort((a,b)=>b[1]-a[1]),mx=Math.max(1,...ent.map(e=>e[1]));
+  $('#finCatBars').innerHTML=ent.map(([k,v],i)=>`<div class="cat-row"><div><b>${esc(k)}</b><span>${rp(v)}</span></div><div class="cat-track"><div class="cat-fill" style="width:${v/mx*100}%;background:${FIN_COL[i%FIN_COL.length]}"></div></div></div>`).join('')||'<p class="hint">Belum ada pengeluaran bulan ini.</p>';
+  /* buku kas */
+  $('#finLedger').innerHTML=L.filter(x=>finFilter==='all'||x.type===finFilter).slice(0,300).map(x=>`<tr><td data-label="Tanggal">${fmtDate(x.date)}</td><td data-label="Kategori"><span class="badge ${x.type==='in'?'badge-ok':'badge-pending'}">${esc(x.cat)}</span></td><td data-label="Keterangan">${esc(x.note)}</td><td data-label="Jumlah" class="${x.type==='in'?'amt-in':'amt-out'}">${x.type==='in'?'+':'-'}${rp(x.amount)}</td><td data-label="Sumber">${x.auto?'<span class="src-auto">Otomatis</span>':`<button onclick="deleteCash('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button>`}</td></tr>`).join('')||empty(5);
+}
+async function deleteCash(id){
+  if(!requireAdmin())return;
+  const c=S.cash.find(x=>String(x.id)===String(id));if(!c)return toast('Data tidak ditemukan!');
+  if(!await confirmDialog(`Hapus transaksi kas?\n\nTanggal: ${c.date}\nKategori: ${c.cat}\nJumlah: ${rp(c.amount)}\n\nData akan dihapus permanen!`))return;
+  const {data,error}=await sb.from('cashbook').delete().eq('id',c.id).select('id');
+  if(error)return toast('Gagal hapus: '+error.message);
+  if(!data||!data.length)return toast('Data tidak terhapus di server. Periksa kebijakan (RLS) DELETE tabel cashbook.');
+  S.cash=S.cash.filter(x=>String(x.id)!==String(id));render();toast('✅ Transaksi kas dihapus.');
+}
+if($('#cashForm')){
+  $('#cashForm').onsubmit=async e=>{
+    e.preventDefault();if(!requireAdmin())return;
+    const x=Object.fromEntries(new FormData(e.target)),amount=+x.amount;
+    if(!(amount>0))return toast('Jumlah harus lebih dari 0.');
+    if(!S.cashOk)return toast('Tabel cashbook belum dibuat. Jalankan keuangan.sql di Supabase (SQL Editor).');
+    const {data,error}=await sb.from('cashbook').insert({date:x.date,type:x.type,cat:x.cat,note:x.note||null,amount}).select().single();
+    if(error)return toast('Gagal simpan: '+error.message);
+    S.cash.push(mapCash(data));render();e.target.reset();e.target.date.value=today;setFinType('in');
+    toast('✅ Transaksi keuangan tersimpan.');
+  };
+  $('#finType').onclick=e=>{const b=e.target.closest('button');if(b)setFinType(b.dataset.t)};
+  $('#finFilter').onclick=e=>{const b=e.target.closest('button');if(!b)return;finFilter=b.dataset.f;$$('#finFilter button').forEach(x=>x.classList.toggle('on',x===b));renderFinance()};
+  setFinType('in');
+}
+const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}};
+const _go=go;go=function(p){_go(p);if(p==='finance'&&cashChart)setTimeout(()=>cashChart.resize(),80)};
+$$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
