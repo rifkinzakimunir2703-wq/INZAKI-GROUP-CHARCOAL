@@ -962,7 +962,7 @@ function ledgerRows(){
 }
 function renderFinance(){
   if(!$('#finLedger'))return;
-  const L=ledgerRows(),sum=(a,t)=>a.filter(x=>x.type===t).reduce((s,x)=>s+x.amount,0),M=L.filter(x=>thisMonth(x.date));
+  const L=ledgerRows(),sum=(a,t)=>a.filter(x=>x.type===t).reduce((s,x)=>s+x.amount,0),M=L.filter(x=>thisMonth(x.date)&&x.cat!=='Penyesuaian saldo');
   const inAll=sum(L,'in'),outAll=sum(L,'out'),inM=sum(M,'in'),outM=sum(M,'out');
   $('#fSaldo').textContent=rp(inAll-outAll);$('#fSaldo').className=inAll-outAll<0?'neg':'';
   $('#fIn').textContent=rp(inM);$('#fInN').textContent=M.filter(x=>x.type==='in').length+' transaksi';
@@ -972,7 +972,7 @@ function renderFinance(){
   /* grafik 6 bulan */
   const n=new Date(),ms=[],lb=[];
   for(let i=5;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth()-i,1);ms.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));lb.push(d.toLocaleDateString('id-ID',{month:'short'}))}
-  const by=t=>ms.map(m=>L.filter(x=>x.type===t&&String(x.date).slice(0,7)===m).reduce((s,x)=>s+x.amount,0));
+  const by=t=>ms.map(m=>L.filter(x=>x.type===t&&x.cat!=='Penyesuaian saldo'&&String(x.date).slice(0,7)===m).reduce((s,x)=>s+x.amount,0));
   if(!cashChart&&window.Chart&&$('#cashChart')){
     cashChart=new Chart($('#cashChart'),{type:'bar',data:{labels:lb,datasets:[{label:'Pemasukan',data:by('in'),backgroundColor:'#22C55E',borderRadius:6},{label:'Pengeluaran',data:by('out'),backgroundColor:'#F76E7E',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8E9A8B'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+rp(c.parsed.y)}}},scales:{y:{ticks:{color:'#8E9A8B',callback:v=>(v/1e6)+' jt'},grid:{color:'rgba(255,255,255,.07)'}},x:{ticks:{color:'#8E9A8B'},grid:{display:false}}}}});
   }else if(cashChart){cashChart.data.labels=lb;cashChart.data.datasets[0].data=by('in');cashChart.data.datasets[1].data=by('out');cashChart.update()}
@@ -1007,6 +1007,41 @@ if($('#cashForm')){
   $('#finFilter').onclick=e=>{const b=e.target.closest('button');if(!b)return;finFilter=b.dataset.f;$$('#finFilter button').forEach(x=>x.classList.toggle('on',x===b));renderFinance()};
   setFinType('in');
 }
-const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}};
+
+/* ---- Tambah / kurangi saldo kas (dicatat di buku kas sebagai "Penyesuaian saldo") ---- */
+async function adjustSaldo(t){
+  if(!requireAdmin())return;
+  if(!S.cashOk)return toast('Tabel cashbook belum dibuat. Jalankan keuangan.sql di Supabase (SQL Editor).');
+  const v=await promptDialog(t==='in'?'Jumlah saldo yang ditambahkan (Rp):':'Jumlah saldo yang dikurangi (Rp):','',t==='in'?'Tambah saldo kas':'Kurangi saldo kas');
+  if(v===null)return;
+  const amount=Math.round(+String(v).replace(/\./g,'').replace(',','.').trim());
+  if(!(amount>0))return toast('Jumlah harus lebih dari 0.');
+  const {data,error}=await sb.from('cashbook').insert({date:today,type:t,cat:'Penyesuaian saldo',note:t==='in'?'Tambah saldo manual':'Kurangi saldo manual',amount}).select().single();
+  if(error)return toast('Gagal simpan: '+error.message);
+  S.cash.push(mapCash(data));render();toast(`✅ Saldo kas ${t==='in'?'ditambah':'dikurangi'} ${rp(amount)}.`);
+}
+if($('#saldoAdd')){$('#saldoAdd').onclick=()=>adjustSaldo('in');$('#saldoSub').onclick=()=>adjustSaldo('out')}
+
+/* ---- Statistik per lini & hasil dari kelapa (dashboard utama) ---- */
+function renderDashExtra(){
+  if(!$('#lineTable'))return;
+  const isB=n=>/batok|tempurung/i.test(n||''),isK=n=>/kelapa/i.test(n||'')&&!isB(n),f1=v=>v.toFixed(1).replace('.',','),sm=(arr,k)=>arr.reduce((s,x)=>s+(+x[k]||0),0);
+  const lines={};S.batches.forEach(b=>{const k=(b.rawName||'?')+'→'+(b.productName||'?');(lines[k]=lines[k]||{raw:b.rawName,prod:b.productName,b:[]}).b.push(b)});
+  $('#lineTable').innerHTML=Object.values(lines).map(l=>{
+    const inp=sm(l.b,'input'),out=sm(l.b,'output'),loss=inp-out,hpp=sm(l.b,'totalHpp'),ys=l.b.map(b=>b.input?b.output/b.input*100:0),avg=ys.reduce((s,v)=>s+v,0)/ys.length;
+    return `<tr><td data-label="Lini"><b>${esc(l.raw)} → ${esc(l.prod)}</b></td><td data-label="Batch">${l.b.length}</td><td data-label="Bahan masuk">${kg(inp)}</td><td data-label="Hasil">${kg(out)}</td><td data-label="Susut">${kg(loss)} (${f1(inp?loss/inp*100:0)}%)</td><td data-label="Rata² rendemen"><b>${f1(avg)}%</b></td><td data-label="Rendemen total">${f1(inp?out/inp*100:0)}%</td><td data-label="HPP/kg">${rp(out?hpp/out:0)}</td></tr>`}).join('')||empty(8);
+  const kb=S.batches.filter(b=>isK(b.rawName)),bb=S.batches.filter(b=>isB(b.rawName));
+  const stokK=S.raw.filter(r=>isK(r.name)).reduce((s,r)=>s+r.qty,0),stokB=S.raw.filter(r=>isB(r.name)).reduce((s,r)=>s+r.qty,0);
+  const procK=sm(kb,'input'),kopra=sm(kb,'output'),procB=sm(bb,'input'),arang=sm(bb,'output');
+  const dibeli=stokK+procK,batok=stokB+procB,base=procK||dibeli;
+  const el=$('#kelapaYield');
+  if(!dibeli){el.innerHTML='<p class="hint">Belum ada data kelapa. Catat pembelian kelapa di menu Bahan Baku dan hasil produksinya di menu Batch.</p>';return}
+  const kp=base?kopra/base*100:0,bp=base?batok/base*100:0,lain=Math.max(0,100-kp-bp);
+  el.innerHTML=`<div class="cards yield-cards"><div><span>Kelapa dibeli</span><b>${kg(dibeli)}</b><small>${kg(procK)} sudah diproses · ${kg(stokK)} masih stok</small></div><div class="accent-green"><span>Kopra dihasilkan</span><b>${kg(kopra)}</b><small>${f1(kp)}% dari kelapa diproses</small></div><div class="accent-amber"><span>Batok kelapa dihasilkan</span><b>${kg(batok)}</b><small>${f1(bp)}% dari kelapa diproses</small></div><div><span>Arang dari batok</span><b>${kg(arang)}</b><small>${procB?f1(arang/procB*100)+'% dari batok diproses':'Batok belum diproses'}</small></div></div>
+  <div class="ystack"><i style="width:${kp}%;background:#22C55E"></i><i style="width:${bp}%;background:#F5A524"></i><i style="width:${lain}%;background:#3A423C"></i></div>
+  <div class="ylegend"><span><i style="background:#22C55E"></i>Kopra ${f1(kp)}%</span><span><i style="background:#F5A524"></i>Batok ${f1(bp)}%</span><span><i style="background:#3A423C"></i>Air &amp; susut ${f1(lain)}%</span></div>
+  <p class="hint">Rata-rata setiap <b>100 kg kelapa</b> menghasilkan sekitar <b>${f1(kp)} kg kopra</b> dan <b>${f1(bp)} kg batok kelapa</b>. Batok dihitung dari yang tercatat di menu Bahan Baku (stok + yang sudah dibuat arang).</p>`;
+}
+const _render=render;render=function(){_render();try{renderFinance()}catch(err){console.error('Keuangan:',err)}try{renderDashExtra()}catch(err){console.error('Statistik:',err)}};
 const _go=go;go=function(p){_go(p);if(p==='finance'&&cashChart)setTimeout(()=>cashChart.resize(),80)};
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
