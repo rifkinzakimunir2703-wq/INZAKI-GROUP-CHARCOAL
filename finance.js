@@ -6,7 +6,11 @@
    Dibangun ulang setelah file aslinya hilang — lihat finance.sql untuk skema tabel.
 */
 
-let FS = { tx: [] };
+let FS = { tx: [], grp: 'all', per: 'all' };
+/* Pengelompokan riwayat keuangan: tiap sumber masuk satu kelompok + warna */
+const FGROUPS = [['all','Semua'],['Penjualan','Penjualan'],['Pengeluaran','Pengeluaran'],['Pembelian','Pembelian'],['DP','Uang Muka (DP)'],['Hutang','Hutang'],['Manual','Manual']];
+const FCOLOR = { Penjualan:'#22C55E', Pengeluaran:'#F76E7E', Pembelian:'#F5A524', DP:'#2DD4CF', Hutang:'#A78BFA', Manual:'#8E9A8B' };
+const fgroup = r => r.source==='Penjualan' ? 'Penjualan' : r.source==='Pengeluaran' ? 'Pengeluaran' : /^Pembelian/.test(r.source) ? 'Pembelian' : r.source==='Uang Muka Supplier' ? 'DP' : /Hutang$/.test(r.source) ? 'Hutang' : 'Manual';
 const mapFinance = x => ({ id: x.id, date: x.date, type: x.type, category: x.category, desc: x.desc, amount: +x.amount });
 
 /* ---- Bangun markup halaman Keuangan sekali saja ---- */
@@ -43,14 +47,20 @@ function ensureFinanceUI(){
 
     <div class="panel">
       <div class="panel-head">
-        <div><h2>Riwayat Arus Kas</h2><small>Gabungan otomatis (penjualan, pengeluaran, pembelian, hutang) &amp; manual</small></div>
+        <div><h2>Riwayat Keuangan</h2><small>Penjualan, pengeluaran, pembelian, uang muka (DP), hutang &amp; kas manual — semua di sini</small></div>
         <input type="text" id="searchFinance" class="table-search" placeholder="Cari sumber / keterangan…">
       </div>
+      <div class="chips" id="finGroupChips" style="flex-wrap:wrap;margin-bottom:10px"></div>
+      <div class="chips" id="finPeriodChips" style="margin-bottom:12px"><button data-p="all" class="on">Semua Waktu</button><button data-p="week">Minggu Ini</button><button data-p="month">Bulan Ini</button></div>
+      <div class="cards mini" id="finSummary" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
       <table><thead><tr><th>Tanggal</th><th>Sumber</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th><th>AKSI</th></tr></thead><tbody id="financeLedgerTable"></tbody></table>
     </div>
   `;
   $('#financeForm').onsubmit = addFinance;
   $('#searchFinance').oninput = renderFinance;
+  $('#financeForm').date.value = today;
+  $('#finGroupChips').onclick = e => { const b=e.target.closest('button'); if(b){ FS.grp=b.dataset.g; renderFinance() } };
+  $('#finPeriodChips').onclick = e => { const b=e.target.closest('button'); if(b){ FS.per=b.dataset.p; renderFinance() } };
 }
 
 /* ---- Muat transaksi kas manual dari Supabase ---- */
@@ -129,9 +139,15 @@ function renderFinance(){
   $('#fkManualCount').textContent = FS.tx.length;
   drawKasChart(rows);
 
+  rows.forEach(r => r.grp = fgroup(r));
   const q=($('#searchFinance')?.value||'').toLowerCase();
-  const filtered = rows.filter(r=> !q || r.source.toLowerCase().includes(q) || (r.desc||'').toLowerCase().includes(q));
-  $('#financeLedgerTable').innerHTML = filtered.slice().reverse().map(r=>`<tr><td data-label="Tanggal">${fmtDate(r.date)}</td><td data-label="Sumber">${esc(r.source)}</td><td data-label="Keterangan">${esc(r.desc)}</td><td data-label="Masuk">${r.in?rp(r.in):'-'}</td><td data-label="Keluar">${r.out?rp(r.out):'-'}</td><td data-label="Saldo">${signed(r.balance)}</td><td data-label="Aksi">${r.auto?'<span class="badge badge-ok">Otomatis</span>':`<button onclick="deleteFinance('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button>`}</td></tr>`).join('') || empty(7);
+  const base = rows.filter(r=> (FS.per==='all' || (FS.per==='week' ? last7(r.date) : thisMonth(r.date))) && (!q || r.source.toLowerCase().includes(q) || (r.desc||'').toLowerCase().includes(q)));
+  const filtered = base.filter(r => FS.grp==='all' || r.grp===FS.grp);
+  $('#finGroupChips').innerHTML = FGROUPS.map(([k,l]) => `<button data-g="${k}" class="${FS.grp===k?'on':''}">${l} (${k==='all'?base.length:base.filter(r=>r.grp===k).length})</button>`).join('');
+  $('#finPeriodChips').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.p===FS.per));
+  const sIn=filtered.reduce((a,r)=>a+r.in,0), sOut=filtered.reduce((a,r)=>a+r.out,0);
+  $('#finSummary').innerHTML = `<div><span>Total Masuk</span><b class="amt-in">${rp(sIn)}</b></div><div><span>Total Keluar</span><b class="amt-out">${rp(sOut)}</b></div><div><span>Jumlah Transaksi</span><b>${filtered.length}</b></div>`;
+  $('#financeLedgerTable').innerHTML = filtered.slice().reverse().map(r=>{ const c=FCOLOR[r.grp]; return `<tr><td data-label="Tanggal">${fmtDate(r.date)}</td><td data-label="Sumber"><span class="badge" style="background:${c}26;color:${c}">${esc(r.source)}</span></td><td data-label="Keterangan">${esc(r.desc)}</td><td data-label="Masuk">${r.in?rp(r.in):'-'}</td><td data-label="Keluar">${r.out?rp(r.out):'-'}</td><td data-label="Saldo">${signed(r.balance)}</td><td data-label="Aksi">${r.auto?'<span class="badge badge-ok">Otomatis</span>':`<button onclick="deleteFinance('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button>`}</td></tr>` }).join('') || empty(7);
 }
 
 /* ---- Hook ke render() utama app.js supaya Keuangan selalu ikut ter-update ---- */
