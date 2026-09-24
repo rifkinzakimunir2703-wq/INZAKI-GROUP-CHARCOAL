@@ -4,7 +4,7 @@ $$('input[type=date]').forEach(x=>x.value=today);
 
 let S={raw:[],batches:[],sales:[],expenses:[],debts:[]};
 let isAdmin=false;
-const ADMIN_PAGES=['raw','batch','sales','expenses','debts','finance'];
+const ADMIN_PAGES=['raw','batch','buy','sales','expenses','debts','finance'];
 
 /* ---- Icons (inline SVG, no external deps) ---- */
 const ICON={
@@ -479,6 +479,8 @@ let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sol
 /* Riwayat pembelian langsung barang jadi */
 if($('#buyTable')){
   const buys=S.batches.filter(isBuy).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code)));
+  const bTotal=buys.reduce((a,b)=>a+b.totalHpp,0),bQty=buys.reduce((a,b)=>a+b.output,0),bLeft=buys.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id)),0);
+  if($('#buyKTotal')){$('#buyKTotal').textContent=rp(bTotal);$('#buyKCount').textContent=buys.length+' transaksi';$('#buyKQty').textContent=kg(bQty);$('#buyKLeft').textContent=kg(bLeft)}
   $('#buyTable').innerHTML=buys.map(b=>{const s=sold(b.id),sisa=b.output-s;return `<tr><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Kode">${esc(b.code)}</td><td data-label="Produk">${esc(b.productName)}${b.note?`<small class="lot-count"> · ${esc(b.note)}</small>`:''}</td><td data-label="Qty">${kg(b.output)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Total">${rp(b.totalHpp)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(sisa)}</td><td data-label="Aksi" class="admin-only"><button type="button" onclick="deleteBuy('${b.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(9);
   if(typeof applyAdminVisibility==='function')applyAdminVisibility();
 }
@@ -680,7 +682,7 @@ async function deleteExpense(id) {
 }
 
 /* ---- Navigation ---- */
-function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='finance'?'Keuangan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
+function go(p){if(ADMIN_PAGES.includes(p)&&!isAdmin)p='dashboard';$$('.page').forEach(x=>x.classList.toggle('active',x.id===p));$$('nav button').forEach(x=>x.classList.toggle('active',x.dataset.page===p));$('#title').textContent=p==='dashboard'?'Dashboard Global':p==='raw'?'Bahan Baku':p==='batch'?'Produksi Batch':p==='finished'?'Barang Jadi':p==='buy'?'Pembelian Barang Jadi':p==='debts'?'Hutang Perusahaan':p==='finance'?'Keuangan':p==='reports'?'Laba & Laporan':p[0].toUpperCase()+p.slice(1);$('#modal').classList.remove('show')}
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
 $('#quick').onclick=()=>{if(requireAdmin())$('#modal').classList.add('show')};
 $$('#modal [data-go]').forEach(x=>x.onclick=()=>go(x.dataset.go));
