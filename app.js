@@ -795,7 +795,11 @@ $('#salesForm').onsubmit=async e=>{
   }
 
   const year = x.date.slice(0,4);
-  const seq = S.sales.filter(s=>s.invoice&&s.invoice.startsWith(`INV-${year}-`)).length + 1;
+  /* Nomor urut dari angka TERBESAR yang pernah dipakai, bukan dari jumlah baris —
+     satu invoice bisa terpecah ke beberapa baris batch, dan baris bisa terhapus,
+     jadi menghitung baris/panjang array bisa menghasilkan nomor yang sudah dipakai (duplikat). */
+  const used = S.sales.filter(s=>s.invoice&&s.invoice.startsWith(`INV-${year}-`)).map(s=>+s.invoice.slice(9)||0);
+  const seq = (used.length?Math.max(...used):0) + 1;
   const invoice_no = `INV-${year}-${String(seq).padStart(4,'0')}`;
 
   /* Alokasi otomatis ke batch-batch produk ini, dari yang paling lama dulu (FIFO) */
