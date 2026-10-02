@@ -45,7 +45,7 @@ function debtRemaining(d){return Math.max(0,(+d.amount||0)-(+d.paidAmount||0))}
 function debtStatus(d){let r=debtRemaining(d);if(r<=0)return{label:'Lunas',cls:'badge-ok'};if(d.dueDate&&day(d.dueDate)<new Date(new Date().setHours(0,0,0,0)))return{label:'Jatuh Tempo',cls:'badge-overdue'};return{label:'Belum Lunas',cls:'badge-pending'}}
 function B(id){return S.batches.find(x=>x.id==id)}
 /* Pembelian langsung barang jadi disimpan sebagai baris di tabel batches dengan kode BLI-... (bukan hasil produksi). PB() = hanya batch produksi, dipakai untuk statistik susut/rendemen/HPP produksi. */
-const isBuy=b=>/^BLI-/i.test((b&&b.code)||'');
+const isBuy=b=>!!b&&(/^BLI-/i.test(b.code||'')||(b.rawName||'').trim().toLowerCase()==='pembelian langsung');
 const PB=()=>S.batches.filter(b=>!isBuy(b));
 function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
 const normName=n=>(n||'').trim().toLowerCase();
@@ -71,6 +71,21 @@ function finishedStockByProduct(){
 }
 /* ---- Business Intelligence: rendemen, BEP, harga jual minimum, simulasi ---- */
 function yieldPct(b){return b.input?b.output/b.input*100:0}
+
+const pctID=v=>v.toFixed(1).replace('.',',');
+/* ---- Estimasi hasil produksi dari stok bahan baku: stok × rata² rendemen per lini (bahan → produk).
+   Hanya batch produksi (PB) yang dipakai; pembelian langsung barang jadi (BLI-) tidak ikut menghitung rendemen. ---- */
+function yieldEstimates(){
+  const lines={},stock={};
+  PB().forEach(b=>{if(!(b.input>0))return;const rk=normName(b.rawName),pk=normName(b.productName);if(!rk||!pk)return;const k=rk+'→'+pk;if(!lines[k])lines[k]={rk,product:(b.productName||'').trim(),ys:[]};lines[k].ys.push(yieldPct(b))});
+  S.raw.forEach(r=>{const k=normName(r.name);if(!k)return;if(!stock[k])stock[k]={key:k,name:(r.name||'').trim(),qty:0};stock[k].qty+=r.qty});
+  return Object.values(stock).filter(v=>v.qty>0.0001).map(v=>({key:v.key,name:v.name,qty:v.qty,lines:Object.values(lines).filter(l=>l.rk===v.key).map(l=>{const n=l.ys.length,avg=l.ys.reduce((a,y)=>a+y,0)/n,mn=Math.min(...l.ys),mx=Math.max(...l.ys);return{product:l.product,n,avg,est:v.qty*avg/100,lo:v.qty*mn/100,hi:v.qty*mx/100}})}));
+}
+function estCardsHtml(){
+  const list=yieldEstimates();
+  if(!list.length)return '<div class="stock-empty">Belum ada stok bahan baku, jadi belum ada yang bisa diestimasi.</div>';
+  return list.map(e=>`<div class="est-card"><div class="est-from"><b>${esc(e.name)}</b><span>${kg(e.qty)}</span></div>`+(e.lines.length?e.lines.map(l=>`<div class="est-line"><div class="est-out"><span>${esc(l.product)}</span><b>≈ ${kg(l.est)}</b></div><div class="est-meta">Rata² rendemen ${pctID(l.avg)}% dari ${l.n} batch${l.n>1?` · kisaran ${kg(l.lo)} – ${kg(l.hi)}`:''}</div></div>`).join(''):'<div class="est-none">Belum ada batch produksi dari bahan ini, jadi rendemennya belum diketahui.</div>')+'</div>').join('');
+}
 function getBiMargin(){let el=$('#biMarginTarget');return el?(+el.value||0):20}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
 function requireAdmin(){if(!isAdmin){toast('Silakan login sebagai admin terlebih dahulu.');return false}return true}
@@ -382,8 +397,8 @@ let yieldTrendTxt='Belum ada tren';
 if(sortedByDate.length>=2){let d=yieldPct(sortedByDate[sortedByDate.length-1])-yieldPct(sortedByDate[sortedByDate.length-2]);if(Math.abs(d)>=0.1)yieldTrendTxt=(d>0?'▲ Naik ':'▼ Turun ')+Math.abs(d).toFixed(1)+' poin dari batch sebelumnya'}
 animateNum(['qgRawValue'],rawValue,rp);
 if($('#qgRawQty'))$('#qgRawQty').textContent=kg(rawQty)+' tersimpan';
-animateNum(['qgFinValue'],finishedValue,rp);
-if($('#qgFinQty'))$('#qgFinQty').textContent=kg(finishedQty)+' siap jual';
+animateNum(['qgFinValue'],Math.max(0,finishedQty),kg);
+if($('#qgFinQty'))$('#qgFinQty').textContent=Object.keys(finishedStockByProduct()).length+' jenis produk siap jual';
 animateNum(['qgBatchMonth'],batchesThisMonth.length,v=>Math.round(v).toLocaleString('id-ID'));
 if($('#qgOutputMonth'))$('#qgOutputMonth').textContent=kg(outputThisMonth)+' dihasilkan';
 animateNum(['qgYieldAvg'],avgYieldAll,v=>v.toFixed(1)+'%');
@@ -401,11 +416,13 @@ Object.keys(rawByName).forEach(k=>{
   rawByName[k].daysLeft=perDay>0?rawByName[k].qty/perDay:null;
 });
 let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let src=isBuy(b)?'buy':'prod',disp=(b.productName||'(tanpa nama)').trim(),k=src+':'+(normName(disp)||'(tanpa nama)');if(!finByName[k])finByName[k]={name:disp,src,qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
+const estMap={};yieldEstimates().forEach(e=>estMap[e.key]=e.lines);
 let rawCardsHtml=Object.values(rawByName).map(v=>{
+  let estTxt=(estMap[normName(v.name)]||[]).map(l=>`<div class="stock-card-est">≈ ${kg(v.qty*l.avg/100)} ${esc(l.product)}</div>`).join('');
   let dl=v.daysLeft,warn=dl!==null&&dl<=14,footer=dl===null?'Belum ada data pemakaian':`≈${Math.round(dl)} hari lagi pada laju pakai saat ini`;
-  return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
+  return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div>${estTxt}<div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
 }).join('');
-const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';const tq=list.reduce((s,v)=>s+v.qty,0);return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span><small>${kg(tq)}</small></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('')};
+const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';const tq=list.reduce((s,v)=>s+v.qty,0);return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span><small>${kg(tq)}</small></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div></div>`).join('')};
 let finCardsHtml=finGroupHtml('prod','Hasil Produksi Sendiri','Produksi Sendiri')+finGroupHtml('buy','Pembelian Langsung','Pembelian Langsung');
 if($('#stockCardsRaw'))$('#stockCardsRaw').innerHTML=rawCardsHtml||'<div class="stock-empty">Belum ada stok bahan baku. Tiap jenis bahan (mis. Kelapa) tampil sebagai kartu sendiri, jumlahnya tidak digabung dengan bahan lain.</div>';
 if($('#stockCardsFinished'))$('#stockCardsFinished').innerHTML=finCardsHtml||'<div class="stock-empty">Belum ada stok barang jadi.</div>';
@@ -448,7 +465,6 @@ $('#lineStatsCards').innerHTML=Object.values(lineStats).length?Object.values(lin
   <div><span>Rendemen</span><b>${(s.input?s.output/s.input*100:0).toFixed(1)}%</b></div>
   <div><span>HPP / kg</span><b>${rp(avgHpp)}</b></div>
   <div><span>Stok Tersisa</span><b>${kg(sisaStok)}</b></div>
-  <div><span>Nilai Stok</span><b>${rp(nilaiStok)}</b></div>
   </div></div>`;
 }).join(''):'<div class="stock-empty">Belum ada data produksi</div>';
 /* ---- Business Intelligence: ringkasan per lini (rendemen, HPP, BEP, harga rekomendasi, margin aktual) ---- */
@@ -522,15 +538,15 @@ renderBatchTable();
 let finGroups=finishedStockByProduct();
 $('#salesBatch').innerHTML=Object.keys(finGroups).length?Object.values(finGroups).map(g=>`<option value="${esc(g.key)}">${esc(g.name)} — sisa total ${kg(g.totalQty)}</option>`).join(''):'<option value="">Belum ada stok barang jadi</option>';
 if(typeof updateSalesAvailHint==='function')updateSalesAvailHint();
-const finRows=(arr,isB)=>arr.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code))).map(b=>{const s=sold(b.id),q=b.output-s;return isB
-  ?`<tr><td data-label="Kode">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}${b.note?`<small class="lot-count"> · ${esc(b.note)}</small>`:''}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`
-  :`<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`}).join('');
+const finRows=(arr,isB)=>arr.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code))).map(b=>{const s=sold(b.id),q=b.output-s,pc=b.output>0?Math.max(0,Math.min(100,q/b.output*100)):0,sisa=`<div class="sisa-cell"><b>${kg(Math.max(0,q))}</b><span class="sisa-bar"><i style="width:${pc}%"></i></span></div>`,cls=q<=0.0001?' class="row-empty"':'';return isB
+  ?`<tr${cls}><td data-label="Kode">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}${b.note?`<small class="lot-count"> · ${esc(b.note)}</small>`:''}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${sisa}</td></tr>`
+  :`<tr${cls}><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${sisa}</td></tr>`}).join('');
 const finStat=arr=>arr.reduce((a,b)=>{const q=Math.max(0,b.output-sold(b.id));a.q+=q;a.v+=q*b.hppkg;return a},{q:0,v:0});
 const finProd=S.batches.filter(b=>!isBuy(b)),finBuy=S.batches.filter(isBuy),sp=finStat(finProd),sb=finStat(finBuy);
 let tq=sp.q+sb.q,tv=sp.v+sb.v;
-$('#finishedTable').innerHTML=finRows(finProd,false)||empty(8);
-$('#finishedBuyTable').innerHTML=finRows(finBuy,true)||empty(7);
-$('#fpQty').textContent=kg(sp.q);$('#fpValue').textContent=rp(sp.v)+' nilai HPP';$('#fbQty').textContent=kg(sb.q);$('#fbValue').textContent=rp(sb.v)+' nilai HPP';
+$('#finishedTable').innerHTML=finRows(finProd,false)||empty(7);
+$('#finishedBuyTable').innerHTML=finRows(finBuy,true)||empty(6);
+const activeBatch=arr=>arr.filter(b=>b.output-sold(b.id)>0.0001).length;$('#fpQty').textContent=kg(sp.q);$('#fpInfo').textContent=activeBatch(finProd)+' batch masih ada stok';$('#fbQty').textContent=kg(sb.q);$('#fbInfo').textContent=activeBatch(finBuy)+' pembelian masih ada stok';
 /* Riwayat pembelian langsung barang jadi */
 if($('#buyTable')){
   const buys=S.batches.filter(isBuy).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code)));
@@ -539,8 +555,9 @@ if($('#buyTable')){
   $('#buyTable').innerHTML=buys.map(b=>{const s=sold(b.id),sisa=b.output-s;return `<tr><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Kode">${esc(b.code)}</td><td data-label="Produk">${esc(b.productName)}${b.note?`<small class="lot-count"> · ${esc(b.note)}</small>`:''}</td><td data-label="Qty">${kg(b.output)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Total">${rp(b.totalHpp)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(sisa)}</td><td data-label="Aksi" class="admin-only"><button type="button" onclick="deleteBuy('${b.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(9);
   if(typeof applyAdminVisibility==='function')applyAdminVisibility();
 }
-$('#fQty').textContent=kg(tq);$('#fValue').textContent=rp(tv);$('#fAvg').textContent=rp(tq?tv/tq:0);
-animateNum(['fQty'],tq,kg);animateNum(['fValue'],tv,rp);animateNum(['fAvg'],tq?tv/tq:0,rp);
+$('#fQty').textContent=kg(tq);animateNum(['fQty'],tq,kg);$('#fCount').textContent=Object.keys(finGroups).length+' jenis produk';
+if($('#finBar'))$('#finBar').innerHTML=tq>0?`<i class="is-product" style="width:${sp.q/tq*100}%"></i><i class="is-buy" style="width:${sb.q/tq*100}%"></i>`:'';
+if($('#estList'))$('#estList').innerHTML=estCardsHtml();
 $('#salesTable').innerHTML=S.sales.slice().reverse().map(x=>{let b=B(x.batchId),c=x.qty*(b?b.hppkg:0),isPiutang=x.status==='Piutang';return `<tr><td data-label="Invoice"><span class="invoice-code">${esc(x.invoice||'-')}</span></td><td data-label="Tanggal">${x.date}</td><td data-label="Batch">${b?.code||'-'}</td><td data-label="Pelanggan">${esc(x.customer||'')}</td><td data-label="Qty">${kg(x.qty)}</td><td data-label="Omzet">${rp(x.total)}</td><td data-label="HPP">${rp(c)}</td><td data-label="Laba">${signed(x.total-c)}</td><td data-label="Status"><span class="badge ${isPiutang?'badge-pending':'badge-ok'}">${esc(x.status)}</span></td><td data-label="Aksi"><div class="sale-actions">${isPiutang?`<button onclick="markSalePaid('${x.id}')" class="btn-paid">${ICON.cash} Lunas</button>`:''}<button onclick="deleteSale('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button></div></td></tr>`}).join('')||empty(10);
 $('#expenseTable').innerHTML=S.expenses.slice().reverse().map(x=>`<tr><td data-label="Tanggal">${x.date}</td><td data-label="Kategori">${x.cat}</td><td data-label="Deskripsi">${esc(x.desc)}</td><td data-label="Jumlah">${rp(x.amount)}</td><td data-label="Aksi"><button onclick="deleteExpense('${x.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(5);
 $('#debtTable').innerHTML=S.debts.slice().reverse().map(d=>{let r=debtRemaining(d),st=debtStatus(d);return `<tr><td data-label="Tanggal">${d.date}</td><td data-label="Kreditur">${esc(d.creditor)}</td><td data-label="Keterangan">${esc(d.desc||'-')}</td><td data-label="Jumlah">${rp(d.amount)}</td><td data-label="Terbayar">${rp(d.paidAmount)}</td><td data-label="Sisa">${rp(r)}</td><td data-label="Jatuh Tempo">${d.dueDate||'-'}</td><td data-label="Status"><span class="badge ${st.cls}">${st.label}</span></td><td data-label="Aksi">${r>0?`<button onclick="payDebt('${d.id}')" class="btn-pay">${ICON.cash} Bayar</button>`:''}<button onclick="deleteDebt('${d.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||empty(9);
@@ -558,7 +575,7 @@ setAll(['prodStatsTable','prodStatsTableD'],prodStatsHtml,false);
 let profitHtml=S.batches.slice().reverse().map(b=>{
   let ss=S.sales.filter(x=>x.batchId==b.id),om=ss.reduce((a,x)=>a+x.total,0),q=ss.reduce((a,x)=>a+x.qty,0),hc=q*b.hppkg,l=om-hc,sisa=b.output-q;
   let status=q===0?{t:'Belum Terjual',c:'badge-pending'}:l>0?{t:'Untung',c:'badge-ok'}:l<0?{t:'Rugi',c:'badge-overdue'}:{t:'Impas',c:'badge-pending'};
-  return `<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan → Produk">${esc(b.rawName)} → ${esc(b.productName)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Susut">${kg(b.loss)} (${b.lossPct.toFixed(1)}%)</td><td data-label="Rendemen">${yieldPct(b).toFixed(1)}%</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Terjual">${kg(q)}</td><td data-label="Sisa Stok">${kg(sisa)}</td><td data-label="Omzet">${rp(om)}</td><td data-label="Untung/Rugi">${signed(l)}</td><td data-label="Margin">${om?(l/om*100).toFixed(1):0}%</td><td data-label="Status"><span class="badge ${status.c}">${status.t}</span></td></tr>`;
+  return `<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${b.date}</td><td data-label="Bahan → Produk">${esc(b.rawName)} → ${esc(b.productName)}</td><td data-label="Output">${kg(b.output)}</td><td data-label="Susut">${isBuy(b)?'—':kg(b.loss)+' ('+b.lossPct.toFixed(1)+'%)'}</td><td data-label="Rendemen">${isBuy(b)?'—':yieldPct(b).toFixed(1)+'%'}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td><td data-label="Terjual">${kg(q)}</td><td data-label="Sisa Stok">${kg(sisa)}</td><td data-label="Omzet">${rp(om)}</td><td data-label="Untung/Rugi">${signed(l)}</td><td data-label="Margin">${om?(l/om*100).toFixed(1):0}%</td><td data-label="Status"><span class="badge ${status.c}">${status.t}</span></td></tr>`;
 }).join('')||empty(13);
 setAll(['profitTable','profitTableD'],profitHtml,false);
 let totalSales=S.sales.reduce((a,x)=>a+x.total,0),totalCogs=S.sales.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),totalExp=S.expenses.reduce((a,x)=>a+x.amount,0);
