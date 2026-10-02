@@ -325,6 +325,52 @@ function buildInsightsHtml(){
 }
 
 /* ---- Render ---- */
+/* ---- Bahan Baku: filter waktu + riwayat pembelian ---- */
+const rawF={period:'all',from:'',to:'',name:''};
+const isoD=x=>{const z=new Date(x.getTime()-x.getTimezoneOffset()*60000);return z.toISOString().slice(0,10)};
+function rawPeriod(){
+  const t=new Date();t.setHours(0,0,0,0);const td=isoD(t),p=rawF.period;
+  if(p==='today')return{test:d=>d===td,label:'Hari ini'};
+  if(p==='7d'){const s=new Date(t);s.setDate(s.getDate()-6);const sd=isoD(s);return{test:d=>d>=sd&&d<=td,label:'7 hari terakhir'}}
+  if(p==='month')return{test:d=>d.slice(0,7)===td.slice(0,7),label:'Bulan ini'};
+  if(p==='lastmonth'){const m=new Date(t.getFullYear(),t.getMonth()-1,1),k=isoD(m).slice(0,7);return{test:d=>d.slice(0,7)===k,label:'Bulan lalu'}}
+  if(p==='custom'){const f=rawF.from,u=rawF.to;return{test:d=>(!f||d>=f)&&(!u||d<=u),label:(f||u)?`${f?fmtDate(f):'awal'} – ${u?fmtDate(u):'sekarang'}`:'Kustom (pilih tanggal)'}}
+  return{test:()=>true,label:'Seluruh waktu'};
+}
+function renderRawSection(){
+  if(!$('#rawTable'))return;
+  const names={};S.raw.forEach(r=>{const d=(r.name||'(tanpa nama)').trim();names[normName(d)||'(tanpa nama)']=d});
+  const sel=$('#rawNameFilter');
+  if(sel){sel.innerHTML='<option value="">Semua bahan</option>'+Object.entries(names).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('');if(rawF.name&&!names[rawF.name])rawF.name='';sel.value=rawF.name}
+  const P=rawPeriod();
+  const rows=S.raw.filter(r=>{const d=String(r.date||'').slice(0,10),k=normName(r.name)||'(tanpa nama)';return P.test(d)&&(!rawF.name||k===rawF.name)})
+    .slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const orig=r=>+r.originalQty||+r.qty||0,extra=r=>(+r.transport||0)+(+r.other||0),total=r=>orig(r)*(+r.price||0)+extra(r);
+  const sum=(arr,f)=>arr.reduce((a,x)=>a+f(x),0);
+  $('#rawKTotal').textContent=rp(sum(rows,total));$('#rawKCount').textContent=rows.length+' transaksi · '+P.label;
+  $('#rawKExtra').textContent=rp(sum(rows,extra));$('#rawKLeft').textContent=kg(sum(rows,r=>+r.qty||0));
+  /* Rincian per bahan (tidak digabung antar jenis bahan) */
+  const g={};rows.forEach(r=>{const d=(r.name||'(tanpa nama)').trim(),k=normName(d)||'(tanpa nama)';(g[k]=g[k]||{name:d,qty:0,cost:0,mat:0,n:0});g[k].qty+=orig(r);g[k].cost+=total(r);g[k].mat+=orig(r)*(+r.price||0);g[k].n++});
+  $('#rawBreakdown').innerHTML=Object.values(g).map(v=>`<div class="rb-item"><b>${esc(v.name)}</b><span>${kg(v.qty)} · ${v.n}x beli</span><small>rata² ${rp(v.qty?v.mat/v.qty:0)}/kg · total ${rp(v.cost)}</small></div>`).join('');
+  $('#rawFilterInfo').textContent='Menampilkan: '+P.label+(rawF.name&&names[rawF.name]?' · '+names[rawF.name]:'')+' — '+rows.length+' dari '+S.raw.length+' pembelian';
+  $('#rawTable').innerHTML=rows.map(r=>{const sisa=+r.qty||0;return `<tr><td data-label="Tanggal">${fmtDate(r.date)}</td><td data-label="Bahan"><b>${esc(r.name)}</b>${r.supplier?`<small class="lot-count"> · ${esc(r.supplier)}</small>`:''}</td><td data-label="Qty masuk">${kg(orig(r))}</td><td data-label="Sisa stok">${kg(sisa)}</td><td data-label="Harga/kg">${rp(r.price)}</td><td data-label="Biaya tambahan">${rp(extra(r))}</td><td data-label="HPP masuk/kg">${rp(landed(r))}</td><td data-label="Total biaya">${rp(total(r))}</td><td data-label="Aksi"><button onclick="deleteRaw('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`}).join('')||`<tr><td colspan="9" style="text-align:center;color:#929a93">${S.raw.length?'Tidak ada pembelian pada filter ini':'Belum ada data'}</td></tr>`;
+  $('#rawFoot').innerHTML=rows.length?`<tr><td colspan="7">Total ${rows.length} transaksi</td><td data-label="Total biaya"><b>${rp(sum(rows,total))}</b></td><td></td></tr>`:'';
+  if(typeof filterTable==='function')filterTable('searchRaw','rawTable');
+}
+document.addEventListener('click',e=>{
+  const b=e.target&&e.target.closest?e.target.closest('#rawFilter .fchips button'):null;if(!b)return;
+  rawF.period=b.dataset.p;
+  if(rawF.period==='custom'&&!rawF.from&&!rawF.to){rawF.to=isoD(new Date());const s=new Date();s.setDate(s.getDate()-29);rawF.from=isoD(s);$('#rawFrom').value=rawF.from;$('#rawTo').value=rawF.to}
+  $$('#rawFilter .fchips button').forEach(x=>x.classList.toggle('on',x===b));
+  $('#rawRange').hidden=rawF.period!=='custom';
+  renderRawSection();
+});
+document.addEventListener('change',e=>{
+  const id=e.target&&e.target.id;
+  if(id==='rawFrom'){rawF.from=e.target.value;renderRawSection()}
+  else if(id==='rawTo'){rawF.to=e.target.value;renderRawSection()}
+  else if(id==='rawNameFilter'){rawF.name=e.target.value;renderRawSection()}
+});
 function render(){
 let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*landed(x),0),out=PB().reduce((a,x)=>a+x.output,0),inp=PB().reduce((a,x)=>a+x.input,0),loss=inp-out;
 let finishedQty=S.batches.reduce((a,x)=>a+x.output,0)-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
@@ -354,12 +400,13 @@ Object.keys(rawByName).forEach(k=>{
   let span=Math.max(1,Math.round((day(u.lastDate)-day(u.firstDate))/86400000)+1),perDay=u.total/span;
   rawByName[k].daysLeft=perDay>0?rawByName[k].qty/perDay:null;
 });
-let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let disp=(b.productName||'(tanpa nama)').trim(),k=normName(disp)||'(tanpa nama)';if(!finByName[k])finByName[k]={name:disp,qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
+let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let src=isBuy(b)?'buy':'prod',disp=(b.productName||'(tanpa nama)').trim(),k=src+':'+(normName(disp)||'(tanpa nama)');if(!finByName[k])finByName[k]={name:disp,src,qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
 let rawCardsHtml=Object.values(rawByName).map(v=>{
   let dl=v.daysLeft,warn=dl!==null&&dl<=14,footer=dl===null?'Belum ada data pemakaian':`≈${Math.round(dl)} hari lagi pada laju pakai saat ini`;
-  return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div><div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
+  return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
 }).join('');
-let finCardsHtml=Object.values(finByName).map(v=>`<div class="stock-card is-product"><span class="stock-tag">Barang Jadi</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('');
+const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';const tq=list.reduce((s,v)=>s+v.qty,0);return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span><small>${kg(tq)}</small></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div><div class="stock-card-value">${rp(v.value)}</div></div>`).join('')};
+let finCardsHtml=finGroupHtml('prod','Hasil Produksi Sendiri','Produksi Sendiri')+finGroupHtml('buy','Pembelian Langsung','Pembelian Langsung');
 if($('#stockCardsRaw'))$('#stockCardsRaw').innerHTML=rawCardsHtml||'<div class="stock-empty">Belum ada stok bahan baku. Tiap jenis bahan (mis. Kelapa) tampil sebagai kartu sendiri, jumlahnya tidak digabung dengan bahan lain.</div>';
 if($('#stockCardsFinished'))$('#stockCardsFinished').innerHTML=finCardsHtml||'<div class="stock-empty">Belum ada stok barang jadi.</div>';
 $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
@@ -467,7 +514,7 @@ drawCostChart('costChartD',costRows,costTotal);
 let insightHtml=buildInsightsHtml();
 if($('#insightList'))$('#insightList').innerHTML=insightHtml;
 if($('#insightListD'))$('#insightListD').innerHTML=insightHtml;
-$('#rawTable').innerHTML=S.raw.map(r=>`<tr><td data-label="Bahan">${esc(r.name)}</td><td data-label="Stok">${kg(r.qty)}</td><td data-label="Harga/kg">${rp(r.price)}</td><td data-label="Transport">${rp(r.transport)}</td><td data-label="Biaya lain">${rp(r.other)}</td><td data-label="HPP masuk/kg">${rp(landed(r))}</td><td data-label="Nilai stok">${rp(r.qty*landed(r))}</td><td data-label="Supplier">${esc(r.supplier||'-')}</td><td data-label="Aksi"><button onclick="deleteRaw('${r.id}')" class="btn-delete">${ICON.trash} Hapus</button></td></tr>`).join('')||empty(9);
+renderRawSection();
 let rawGroups=rawStockByName();
 $('#rawSelect').innerHTML=Object.keys(rawGroups).length?Object.values(rawGroups).map(g=>`<option value="${esc(g.key)}">${esc(g.name)} — tersedia total ${kg(g.totalQty)}</option>`).join(''):'<option value="">Belum ada stok bahan baku</option>';
 if(typeof updateRawAvailHint==='function')updateRawAvailHint();
@@ -475,7 +522,15 @@ renderBatchTable();
 let finGroups=finishedStockByProduct();
 $('#salesBatch').innerHTML=Object.keys(finGroups).length?Object.values(finGroups).map(g=>`<option value="${esc(g.key)}">${esc(g.name)} — sisa total ${kg(g.totalQty)}</option>`).join(''):'<option value="">Belum ada stok barang jadi</option>';
 if(typeof updateSalesAvailHint==='function')updateSalesAvailHint();
-let tq=0,tv=0;$('#finishedTable').innerHTML=S.batches.map(b=>{let q=b.output-sold(b.id);tq+=q;tv+=q*b.hppkg;return `<tr><td data-label="Batch">${b.code}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(sold(b.id))}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`}).join('')||empty(7);
+const finRows=(arr,isB)=>arr.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code))).map(b=>{const s=sold(b.id),q=b.output-s;return isB
+  ?`<tr><td data-label="Kode">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}${b.note?`<small class="lot-count"> · ${esc(b.note)}</small>`:''}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`
+  :`<tr><td data-label="Batch">${esc(b.code)}</td><td data-label="Tanggal">${fmtDate(b.date)}</td><td data-label="Produk Jadi">${esc(b.productName)}</td><td data-label="Bahan Asal">${esc(b.rawName)}</td><td data-label="Masuk">${kg(b.output)}</td><td data-label="Terjual">${kg(s)}</td><td data-label="Sisa">${kg(q)}</td><td data-label="HPP/kg">${rp(b.hppkg)}</td></tr>`}).join('');
+const finStat=arr=>arr.reduce((a,b)=>{const q=Math.max(0,b.output-sold(b.id));a.q+=q;a.v+=q*b.hppkg;return a},{q:0,v:0});
+const finProd=S.batches.filter(b=>!isBuy(b)),finBuy=S.batches.filter(isBuy),sp=finStat(finProd),sb=finStat(finBuy);
+let tq=sp.q+sb.q,tv=sp.v+sb.v;
+$('#finishedTable').innerHTML=finRows(finProd,false)||empty(8);
+$('#finishedBuyTable').innerHTML=finRows(finBuy,true)||empty(7);
+$('#fpQty').textContent=kg(sp.q);$('#fpValue').textContent=rp(sp.v)+' nilai HPP';$('#fbQty').textContent=kg(sb.q);$('#fbValue').textContent=rp(sb.v)+' nilai HPP';
 /* Riwayat pembelian langsung barang jadi */
 if($('#buyTable')){
   const buys=S.batches.filter(isBuy).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.code).localeCompare(String(a.code)));
