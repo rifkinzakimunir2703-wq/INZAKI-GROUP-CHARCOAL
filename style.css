@@ -670,3 +670,21 @@ tr.row-empty td{opacity:.5}
 .cards.batch-stats{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
 .cards.batch-stats>div:nth-child(5){--card-accent:var(--teal)}
 @media(max-width:900px){.cards.quick-glance{grid-template-columns:1fr 1fr}.cards.quick-glance>div:last-child:nth-child(odd){grid-column:1/-1}}
+
+.fin-totals-wrap{grid-column:1/-1}
+.fin-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:14px}
+.fin-tot{background:var(--surface-3);border:1px solid var(--border);border-left:3px solid var(--teal);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.fin-tot span{font-size:11px;font-weight:600;color:var(--muted)}
+.fin-tot b{font-family:var(--font-mono);font-size:22px;color:var(--ink)}
+.fin-tot.is-zero b{color:var(--muted-2)}
+
+.fin-tot.is-buy{border-left-color:var(--violet)}
+.fin-src{margin-bottom:12px}
+.fin-src-title{font-size:11px;font-weight:700;color:var(--teal);margin:0 0 7px 2px}
+.fin-src-title.is-buy{color:var(--violet)}
+.fin-src .fin-totals{margin-bottom:0}
+.fin-totals-wrap .fin-totals{margin-bottom:2px}
+
+.fin-tot small{color:var(--muted-2);font-size:11px}
+.fin-totals{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.fin-tot.is-buy{border-left-color:var(--teal)}

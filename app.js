@@ -437,10 +437,16 @@ let rawCardsHtml=Object.values(rawByName).map(v=>{
   let dl=v.daysLeft,warn=dl!==null&&dl<=14,footer=dl===null?'Belum ada data pemakaian':`≈${Math.round(dl)} hari lagi pada laju pakai saat ini`;
   return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div>${estTxt}<div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
 }).join('');
-const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';const tq=list.reduce((s,v)=>s+v.qty,0);return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span><small>${kg(tq)}</small></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div></div>`).join('')};
-let finCardsHtml=finGroupHtml('prod','Hasil Produksi Sendiri','Produksi Sendiri')+finGroupHtml('buy','Pembelian Langsung','Pembelian Langsung');
+/* Total per produk = gabungan produksi sendiri + pembelian langsung. Kopra dan Arang masing-masing kartu sendiri, rinciannya di bawah angka. */
+const finTot={};Object.values(finByName).forEach(v=>{const k=normName(v.name);if(!finTot[k])finTot[k]={name:v.name,prod:0,buy:0};finTot[k][v.src]+=v.qty});
+['kopra','arang'].forEach(k=>{if(!finTot[k])finTot[k]={name:k==='kopra'?'Kopra':'Arang',prod:0,buy:0}});
+const finTotKeys=['kopra','arang',...Object.keys(finTot).filter(k=>k!=='kopra'&&k!=='arang')];
+const finTotalsHtml=`<div class="fin-totals">${finTotKeys.map(k=>{const t=finTot[k],q=t.prod+t.buy;return `<div class="fin-tot${q>0?'':' is-zero'}"><span>Total ${esc(t.name)}</span><b>${kg(q)}</b><small>Produksi ${kg(t.prod)} · Pembelian ${kg(t.buy)}</small></div>`}).join('')}</div>`;
+const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div></div>`).join('')};
+let finCardsHtml=`<div class="fin-totals-wrap">${finTotalsHtml}</div>`+finGroupHtml('prod','Hasil Produksi Sendiri','Produksi Sendiri')+finGroupHtml('buy','Pembelian Langsung','Pembelian Langsung');
 if($('#stockCardsRaw'))$('#stockCardsRaw').innerHTML=rawCardsHtml||'<div class="stock-empty">Belum ada stok bahan baku. Tiap jenis bahan (mis. Kelapa) tampil sebagai kartu sendiri, jumlahnya tidak digabung dengan bahan lain.</div>';
 if($('#stockCardsFinished'))$('#stockCardsFinished').innerHTML=finCardsHtml||'<div class="stock-empty">Belum ada stok barang jadi.</div>';
+if($('#finTotals'))$('#finTotals').innerHTML=finTotalsHtml;
 $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
 /* Hutang perusahaan */
 let activeDebts=S.debts.filter(d=>debtRemaining(d)>0),outstanding=activeDebts.reduce((a,d)=>a+debtRemaining(d),0),overdue=activeDebts.filter(d=>debtStatus(d).label==='Jatuh Tempo').length;
