@@ -18,7 +18,8 @@
 <div><span>Nilai Stok Bahan Baku</span><b id="qgRawValue">Rp0</b><small id="qgRawQty">0 kg tersimpan</small></div>
 <div><span>Stok Barang Jadi</span><b id="qgFinValue">0 kg</b><small id="qgFinQty">0 kg siap jual</small></div>
 <div><span>Batch Bulan Ini</span><b id="qgBatchMonth">0</b><small id="qgOutputMonth">0 kg dihasilkan</small></div>
-<div><span>Rata² Rendemen Keseluruhan</span><b id="qgYieldAvg">0%</b><small id="qgYieldTrend">Belum ada tren</small></div>
+<div><span>Rata² Rendemen Kopra</span><b id="qgYieldAvg">0%</b><small id="qgYieldTrend">Belum ada tren</small></div>
+<div><span>Rata² Rendemen Arang</span><b id="qgYieldArang">0%</b><small id="qgYieldArangTrend">Belum ada batch arang</small></div>
 </div>
 </div>
 
@@ -188,6 +189,12 @@
 <label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label>
 <label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div>
 <button class="primary full">Tambah Stok Bahan</button></form></div>
+<div class="panel batok-panel"><div class="panel-head"><div><h2>Catat Batok Kelapa</h2><small>Batok adalah hasil sampingan kelapa. Catat berapa kg batok yang diperoleh, hasilnya langsung masuk ke stok bahan baku "Batok Kelapa". Stok Kelapa tidak berkurang di sini karena sudah berkurang lewat Batch Produksi.</small></div></div>
+<div class="batok-info"><div><span>Stok Kelapa</span><b id="batokKelapaStock">0 kg</b><small id="batokKelapaSub">Belum dipakai produksi</small></div><div><span>Estimasi batok dari stok</span><b id="batokEstQty">—</b><small id="batokEstSub">Belum ada data rasio</small></div><div><span>Stok Batok Kelapa</span><b id="batokStock">0 kg</b><small id="batokStockSub">Sudah tercatat 0 kg</small></div></div>
+<form id="batokForm" class="form"><label>Tanggal<input type="date" name="date" required></label><label>Batok kelapa diperoleh (kg)<input type="number" name="qty" min="0" step="0.01" inputmode="decimal" required></label>
+<label>Harga/kg (Rp, opsional)<input type="number" name="price" min="0" value="0"></label><label>Catatan<input name="supplier" placeholder="Opsional"></label>
+<button type="button" class="ghost full" id="batokFillEst">Isi dengan estimasi dari stok Kelapa</button>
+<button class="primary full">Catat ke Stok Bahan Baku</button></form></div>
 <div class="panel"><div class="panel-head"><div><h2>Riwayat Pembelian Bahan Baku</h2><small>Terbaru di atas · filter berlaku untuk tabel dan ringkasan</small></div></div>
 <div class="fbar" id="rawFilter">
 <div class="fchips"><button type="button" data-p="all" class="on">Semua</button><button type="button" data-p="today">Hari ini</button><button type="button" data-p="7d">7 hari</button><button type="button" data-p="month">Bulan ini</button><button type="button" data-p="lastmonth">Bulan lalu</button><button type="button" data-p="custom">Kustom</button></div>

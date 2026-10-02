@@ -47,6 +47,12 @@ function B(id){return S.batches.find(x=>x.id==id)}
 /* Pembelian langsung barang jadi disimpan sebagai baris di tabel batches dengan kode BLI-... (bukan hasil produksi). PB() = hanya batch produksi, dipakai untuk statistik susut/rendemen/HPP produksi. */
 const isBuy=b=>!!b&&(/^BLI-/i.test(b.code||'')||(b.rawName||'').trim().toLowerCase()==='pembelian langsung');
 const PB=()=>S.batches.filter(b=>!isBuy(b));
+/* Rendemen dipisah per kelompok: lini batok → arang tidak boleh ikut menghitung rata² rendemen kopra (kelapa → kopra). */
+const isBatokRaw=n=>/batok|tempurung/i.test(n||'');
+const PBA=()=>PB().filter(b=>isBatokRaw(b.rawName));
+const PBK=()=>PB().filter(b=>!isBatokRaw(b.rawName));
+const avgYieldOf=arr=>arr.length?arr.reduce((a,b)=>a+yieldPct(b),0)/arr.length:0;
+function yieldTrendOf(arr){const s=arr.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));if(s.length<2)return 'Belum ada tren';const d=yieldPct(s[s.length-1])-yieldPct(s[s.length-2]);return Math.abs(d)>=0.1?(d>0?'▲ Naik ':'▼ Turun ')+Math.abs(d).toFixed(1)+' poin dari batch sebelumnya':'Belum ada tren'}
 function sold(id){return S.sales.filter(x=>x.batchId==id).reduce((a,x)=>a+x.qty,0)}
 const normName=n=>(n||'').trim().toLowerCase();
 /* ---- Stok bahan baku digabung per NAMA (lintas lot), dari yang paling lama masuk dulu (FIFO) ---- */
@@ -77,14 +83,21 @@ const pctID=v=>v.toFixed(1).replace('.',',');
    Hanya batch produksi (PB) yang dipakai; pembelian langsung barang jadi (BLI-) tidak ikut menghitung rendemen. ---- */
 function yieldEstimates(){
   const lines={},stock={};
-  PB().forEach(b=>{if(!(b.input>0))return;const rk=normName(b.rawName),pk=normName(b.productName);if(!rk||!pk)return;const k=rk+'→'+pk;if(!lines[k])lines[k]={rk,product:(b.productName||'').trim(),ys:[]};lines[k].ys.push(yieldPct(b))});
+  PB().forEach(b=>{if(!(b.input>0))return;const rk=normName(b.rawName),pk=normName(b.productName);if(!rk||!pk||rk===pk)return;const k=rk+'→'+pk;if(!lines[k])lines[k]={rk,product:(b.productName||'').trim(),ys:[]};lines[k].ys.push(yieldPct(b))});
   S.raw.forEach(r=>{const k=normName(r.name);if(!k)return;if(!stock[k])stock[k]={key:k,name:(r.name||'').trim(),qty:0};stock[k].qty+=r.qty});
-  return Object.values(stock).filter(v=>v.qty>0.0001).map(v=>({key:v.key,name:v.name,qty:v.qty,lines:Object.values(lines).filter(l=>l.rk===v.key).map(l=>{const n=l.ys.length,avg=l.ys.reduce((a,y)=>a+y,0)/n,mn=Math.min(...l.ys),mx=Math.max(...l.ys);return{product:l.product,n,avg,est:v.qty*avg/100,lo:v.qty*mn/100,hi:v.qty*mx/100}})}));
+  /* Batok kelapa bukan output batch: dicatat sebagai bahan baku. Rasio = total batok tercatat ÷ total kelapa yang sudah diproses */
+  const isBt=n=>/batok|tempurung/i.test(n||''),isKl=n=>/kelapa/i.test(n||'')&&!isBt(n);
+  const kProc=PB().filter(b=>isKl(b.rawName)).reduce((a,b)=>a+(+b.input||0),0),batokTot=S.raw.filter(r=>isBt(r.name)).reduce((a,r)=>a+(+r.originalQty||+r.qty||0),0);
+  return Object.values(stock).filter(v=>v.qty>0.0001).map(v=>{
+    const ls=Object.values(lines).filter(l=>l.rk===v.key).map(l=>{const n=l.ys.length,avg=l.ys.reduce((a,y)=>a+y,0)/n,mn=Math.min(...l.ys),mx=Math.max(...l.ys);return{product:l.product,n,avg,est:v.qty*avg/100,lo:v.qty*mn/100,hi:v.qty*mx/100}});
+    if(isKl(v.name)&&kProc>0&&batokTot>0){const avg=batokTot/kProc*100;ls.push({product:'Batok Kelapa',n:0,avg,est:v.qty*avg/100,batok:true,note:`${kg(batokTot)} batok tercatat dari ${kg(kProc)} kelapa yang sudah diproses`})}
+    return{key:v.key,name:v.name,qty:v.qty,lines:ls}
+  });
 }
 function estCardsHtml(){
   const list=yieldEstimates();
   if(!list.length)return '<div class="stock-empty">Belum ada stok bahan baku, jadi belum ada yang bisa diestimasi.</div>';
-  return list.map(e=>`<div class="est-card"><div class="est-from"><b>${esc(e.name)}</b><span>${kg(e.qty)}</span></div>`+(e.lines.length?e.lines.map(l=>`<div class="est-line"><div class="est-out"><span>${esc(l.product)}</span><b>≈ ${kg(l.est)}</b></div><div class="est-meta">Rata² rendemen ${pctID(l.avg)}% dari ${l.n} batch${l.n>1?` · kisaran ${kg(l.lo)} – ${kg(l.hi)}`:''}</div></div>`).join(''):'<div class="est-none">Belum ada batch produksi dari bahan ini, jadi rendemennya belum diketahui.</div>')+'</div>').join('');
+  return list.map(e=>`<div class="est-card"><div class="est-from"><b>${esc(e.name)}</b><span>${kg(e.qty)}</span></div>`+(e.lines.length?e.lines.map(l=>`<div class="est-line"><div class="est-out"><span>${esc(l.product)}</span><b>≈ ${kg(l.est)}</b></div><div class="est-meta">${l.batok?`Rasio batok ${pctID(l.avg)}% · ${l.note}`:`Rata² rendemen ${pctID(l.avg)}% dari ${l.n} batch${l.n>1?` · kisaran ${kg(l.lo)} – ${kg(l.hi)}`:''}`}</div></div>`).join(''):'<div class="est-none">Belum ada batch produksi dari bahan ini, jadi rendemennya belum diketahui.</div>')+'</div>').join('');
 }
 function getBiMargin(){let el=$('#biMarginTarget');return el?(+el.value||0):20}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
@@ -300,11 +313,14 @@ function drawCostChart(elId,rows,total){
 /* ---- Insight & Rekomendasi otomatis (rule-based dari data yang ada) ---- */
 function buildInsightsHtml(){
  let insights=[];
- let sorted=PB().slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
- if(sorted.length>=2){
-   let prev=sorted[sorted.length-2],cur=sorted[sorted.length-1],py=yieldPct(prev),cy=yieldPct(cur),diff=cy-py;
-   if(Math.abs(diff)>=0.5)insights.push({type:diff>0?'up':'down',title:diff>0?'Rendemen meningkat':'Rendemen menurun',body:`${esc(cur.code)} ${diff>0?'naik':'turun'} ${Math.abs(diff).toFixed(1)} poin dibanding ${esc(prev.code)} (${py.toFixed(1)}% → ${cy.toFixed(1)}%).`});
- }
+ /* Tren rendemen dibandingkan dalam kelompok yang sama saja (kopra dengan kopra, arang dengan arang) */
+ [PBK(),PBA()].forEach(grp=>{
+   let sorted=grp.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+   if(sorted.length>=2){
+     let prev=sorted[sorted.length-2],cur=sorted[sorted.length-1],py=yieldPct(prev),cy=yieldPct(cur),diff=cy-py;
+     if(Math.abs(diff)>=0.5)insights.push({type:diff>0?'up':'down',title:`Rendemen ${esc(cur.productName||'produksi')} ${diff>0?'meningkat':'menurun'}`,body:`${esc(cur.code)} ${diff>0?'naik':'turun'} ${Math.abs(diff).toFixed(1)} poin dibanding ${esc(prev.code)} (${py.toFixed(1)}% → ${cy.toFixed(1)}%).`});
+   }
+ });
  let sellPriceOf=b=>{let ss=S.sales.filter(x=>x.batchId==b.id),q=ss.reduce((a,x)=>a+x.qty,0);return q?ss.reduce((a,x)=>a+x.total,0)/q:null};
  let belowHpp=S.batches.map(b=>({b,p:sellPriceOf(b)})).filter(x=>x.p!==null&&x.p<x.b.hppkg);
  if(belowHpp.length){
@@ -312,8 +328,8 @@ function buildInsightsHtml(){
    insights.push({type:'warn',title:'Harga jual masih di bawah HPP',body:`Harga jual efektif: ${rp(minP)} – ${rp(maxP)}/kg. BEP minimal: ${rp(bepMin)}/kg.`});
  }
  let saran=[];
- let avgYieldAll=PB().length?PB().reduce((a,b)=>a+yieldPct(b),0)/PB().length:0;
- if(PB().length&&avgYieldAll<27)saran.push('Tingkatkan rendemen produksi (target ≥27%).');
+ let avgYieldAll=avgYieldOf(PBK());
+ if(PBK().length&&avgYieldAll<27)saran.push('Tingkatkan rendemen kopra (target ≥27%).');
  let highLoss=PB().filter(b=>b.lossPct>75);
  if(highLoss.length)saran.push(`Evaluasi penyebab susut tinggi di ${highLoss.map(b=>esc(b.code)).join(', ')}.`);
  if(belowHpp.length)saran.push('Naikkan harga jual atau cari pasar dengan harga lebih baik.');
@@ -391,10 +407,7 @@ let rawQty=S.raw.reduce((a,x)=>a+x.qty,0),rawValue=S.raw.reduce((a,x)=>a+x.qty*l
 let finishedQty=S.batches.reduce((a,x)=>a+x.output,0)-S.sales.reduce((a,x)=>a+x.qty,0),finishedValue=S.batches.reduce((a,b)=>a+Math.max(0,b.output-sold(b.id))*b.hppkg,0);
 /* ---- Ringkasan Cepat (KPI strip paling atas dashboard) ---- */
 let batchesThisMonth=PB().filter(b=>thisMonth(b.date)),outputThisMonth=batchesThisMonth.reduce((a,b)=>a+b.output,0);
-let avgYieldAll=PB().length?PB().reduce((a,b)=>a+yieldPct(b),0)/PB().length:0;
-let sortedByDate=PB().slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
-let yieldTrendTxt='Belum ada tren';
-if(sortedByDate.length>=2){let d=yieldPct(sortedByDate[sortedByDate.length-1])-yieldPct(sortedByDate[sortedByDate.length-2]);if(Math.abs(d)>=0.1)yieldTrendTxt=(d>0?'▲ Naik ':'▼ Turun ')+Math.abs(d).toFixed(1)+' poin dari batch sebelumnya'}
+let avgYieldAll=avgYieldOf(PBK()),yieldTrendTxt=yieldTrendOf(PBK()),avgYieldArang=avgYieldOf(PBA()),yieldTrendArang=yieldTrendOf(PBA());
 animateNum(['qgRawValue'],rawValue,rp);
 if($('#qgRawQty'))$('#qgRawQty').textContent=kg(rawQty)+' tersimpan';
 animateNum(['qgFinValue'],Math.max(0,finishedQty),kg);
@@ -403,6 +416,8 @@ animateNum(['qgBatchMonth'],batchesThisMonth.length,v=>Math.round(v).toLocaleStr
 if($('#qgOutputMonth'))$('#qgOutputMonth').textContent=kg(outputThisMonth)+' dihasilkan';
 animateNum(['qgYieldAvg'],avgYieldAll,v=>v.toFixed(1)+'%');
 if($('#qgYieldTrend'))$('#qgYieldTrend').textContent=yieldTrendTxt;
+animateNum(['qgYieldArang'],avgYieldArang,v=>v.toFixed(1)+'%');
+if($('#qgYieldArangTrend'))$('#qgYieldArangTrend').textContent=PBA().length?yieldTrendArang:'Belum ada batch arang';
 let ws=S.sales.filter(x=>last7(x.date)),ms=S.sales.filter(x=>thisMonth(x.date)),we=S.expenses.filter(x=>last7(x.date)).reduce((a,x)=>a+x.amount,0),me=S.expenses.filter(x=>thisMonth(x.date)).reduce((a,x)=>a+x.amount,0);
 let wc=ws.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0),mc=ms.reduce((a,x)=>{let b=B(x.batchId);return a+(b?x.qty*b.hppkg:0)},0);
 /* Kartu stok terpisah per jenis: tiap bahan baku & tiap produk jadi dapat kartu sendiri */
@@ -418,7 +433,7 @@ Object.keys(rawByName).forEach(k=>{
 let finByName={};S.batches.forEach(b=>{let q=b.output-sold(b.id);if(q<=0)return;let src=isBuy(b)?'buy':'prod',disp=(b.productName||'(tanpa nama)').trim(),k=src+':'+(normName(disp)||'(tanpa nama)');if(!finByName[k])finByName[k]={name:disp,src,qty:0,value:0};finByName[k].qty+=q;finByName[k].value+=q*b.hppkg});
 const estMap={};yieldEstimates().forEach(e=>estMap[e.key]=e.lines);
 let rawCardsHtml=Object.values(rawByName).map(v=>{
-  let estTxt=(estMap[normName(v.name)]||[]).map(l=>`<div class="stock-card-est">≈ ${kg(v.qty*l.avg/100)} ${esc(l.product)}</div>`).join('');
+  let estTxt=(estMap[normName(v.name)]||[]).map(l=>`<div class="stock-card-est">≈ ${kg(v.qty*l.avg/100)} ${esc(l.product)}<small>${l.batok?'rasio batok':'rendemen'} ${pctID(l.avg)}%</small></div>`).join('');
   let dl=v.daysLeft,warn=dl!==null&&dl<=14,footer=dl===null?'Belum ada data pemakaian':`≈${Math.round(dl)} hari lagi pada laju pakai saat ini`;
   return `<div class="stock-card is-raw${warn?' is-low':''}"><span class="stock-tag">Bahan Baku</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div>${estTxt}<div class="stock-card-eta${warn?' warn':''}">${warn?'⚠ ':''}${footer}</div></div>`;
 }).join('');
@@ -621,13 +636,16 @@ function renderBatchTable(){
 
   /* Statistik ringkas mengikuti filter yang aktif */
   let n=list.length,totalIn=list.reduce((a,b)=>a+b.input,0),totalOut=list.reduce((a,b)=>a+b.output,0),totalHpp=list.reduce((a,b)=>a+b.totalHpp,0);
-  let avgYield=n?list.reduce((a,b)=>a+yieldPct(b),0)/n:0;
-  let best=n?list.reduce((a,b)=>yieldPct(b)>yieldPct(a)?b:a):null;
+  /* Rata² rendemen dipisah: kopra (dan lainnya) vs arang dari batok */
+  let kL=list.filter(b=>!isBatokRaw(b.rawName)),aL=list.filter(b=>isBatokRaw(b.rawName)),mainL=kL.length?kL:aL,both=kL.length>0&&aL.length>0;
+  let avgYield=avgYieldOf(mainL),best=mainL.length?mainL.reduce((a,b)=>yieldPct(b)>yieldPct(a)?b:a):null;
+  let yieldLabel=both?'Rata² Rendemen Kopra':(!kL.length&&aL.length?'Rata² Rendemen Arang':'Rata² Rendemen');
+  let arangCard=both?`<div><span>Rata² Rendemen Arang</span><b>${avgYieldOf(aL).toFixed(1)}%</b><small>${aL.length} batch arang</small></div>`:'';
   if($('#batchStatsStrip'))$('#batchStatsStrip').innerHTML=`
 <div><span>Jumlah Batch</span><b>${n}</b><small>${prodSel.value?esc(prodSel.value):'Semua produk'}</small></div>
 <div><span>Total Bahan Masuk</span><b>${kg(totalIn)}</b><small>Rata² ${n?kg(totalIn/n):'0 kg'}/batch</small></div>
 <div><span>Total Produk Jadi</span><b>${kg(totalOut)}</b><small>Total HPP ${rp(totalHpp)}</small></div>
-<div><span>Rata² Rendemen</span><b>${avgYield.toFixed(1)}%</b><small>${best?`Terbaik ${esc(best.code)} (${yieldPct(best).toFixed(1)}%)`:'Belum ada data'}</small></div>`;
+<div><span>${yieldLabel}</span><b>${avgYield.toFixed(1)}%</b><small>${best?`Terbaik ${esc(best.code)} (${yieldPct(best).toFixed(1)}%)`:'Belum ada data'}</small></div>${arangCard}`;
 
   $('#batchTable').innerHTML=list.map(b=>{
     let pct=yieldPct(b),cls=pct>=27?'good':(pct>=18?'warn':'bad');
@@ -772,6 +790,39 @@ $('#rawForm').onsubmit=async e=>{
   S.raw.push(mapRaw(data));render();e.target.reset();e.target.date.value=today;rawPreview();
   toast('Bahan baku berhasil dicatat.');
 };
+
+
+/* ---- Catat Batok Kelapa: hasil sampingan kelapa, masuk ke stok bahan baku (raw_materials) sebagai "Batok Kelapa" ---- */
+const isBatokName=n=>/batok|tempurung/i.test(n||''),isKelapaName=n=>/kelapa/i.test(n||'')&&!isBatokName(n);
+function batokInfo(){
+  const kStock=S.raw.filter(r=>isKelapaName(r.name)).reduce((a,r)=>a+r.qty,0),bStock=S.raw.filter(r=>isBatokName(r.name)).reduce((a,r)=>a+r.qty,0);
+  const bTot=S.raw.filter(r=>isBatokName(r.name)).reduce((a,r)=>a+(+r.originalQty||+r.qty||0),0),kProc=PB().filter(b=>isKelapaName(b.rawName)).reduce((a,b)=>a+(+b.input||0),0);
+  const ratio=kProc>0&&bTot>0?bTot/kProc*100:null;
+  return{kStock,bStock,bTot,kProc,ratio,est:ratio===null?null:kStock*ratio/100};
+}
+function renderBatokInfo(){
+  if(!$('#batokKelapaStock'))return;const i=batokInfo();
+  $('#batokKelapaStock').textContent=kg(i.kStock);$('#batokKelapaSub').textContent=i.kProc>0?`${kg(i.kProc)} kelapa sudah diproses`:'Belum dipakai produksi';
+  $('#batokEstQty').textContent=i.est===null?'—':'≈ '+kg(i.est);$('#batokEstSub').textContent=i.ratio===null?'Muncul setelah ada batok tercatat & kelapa diproses':`Rasio batok ${pctID(i.ratio)}% dari kelapa`;
+  $('#batokStock').textContent=kg(i.bStock);$('#batokStockSub').textContent=`Total tercatat ${kg(i.bTot)}`;
+}
+if($('#batokForm')){
+  $('#batokForm').elements.date.value=today;
+  $('#batokFillEst').onclick=()=>{const i=batokInfo();if(i.est===null)return toast('Belum ada data rasio batok untuk diestimasi.');$('#batokForm').elements.qty.value=Math.round(i.est*100)/100};
+  $('#batokForm').onsubmit=async e=>{
+    e.preventDefault();if(!requireAdmin())return;
+    const x=Object.fromEntries(new FormData(e.target)),q=+x.qty;
+    if(!(q>0))return toast('Qty batok kelapa harus lebih dari 0.');
+    const ex=S.raw.find(r=>isBatokName(r.name)),name=ex?(ex.name||'').trim()||'Batok Kelapa':'Batok Kelapa';
+    const btn=e.target.querySelector('button.primary');btn.disabled=true;
+    try{
+      const {data,error}=await sb.from('raw_materials').insert({date:x.date||today,name,qty:q,original_qty:q,price:+x.price||0,transport:0,other:0,supplier:(x.supplier||'').trim()||null}).select().single();
+      if(error)return toast('Gagal simpan: '+error.message);
+      S.raw.push(mapRaw(data));render();e.target.reset();e.target.elements.date.value=today;
+      toast(`✅ Stok Batok Kelapa bertambah ${kg(q)}.`);
+    }finally{btn.disabled=false}
+  };
+}
 
 /* ---- Auto-isi nama produk sesuai bahan baku (Kelapa→Kopra, Batok Kelapa→Arang), supaya nama lini produksi konsisten untuk statistik ---- */
 function suggestProductName(rawName){
@@ -1160,5 +1211,5 @@ function renderDashExtra(){
   <p class="hint">Rata-rata setiap <b>100 kg kelapa</b> menghasilkan sekitar <b>${f1(kp)} kg kopra</b> dan <b>${f1(bp)} kg batok kelapa</b>. Batok dihitung dari yang tercatat di menu Bahan Baku.</p>`;
 }
 /* Hook render: statistik per lini (dashboard). Modul Keuangan mandiri ada di finance.js */
-const _render=render;render=function(){_render();try{renderDashExtra()}catch(err){console.error('Statistik:',err)}try{fillBuyProducts()}catch(err){}};
+const _render=render;render=function(){_render();try{renderDashExtra()}catch(err){console.error('Statistik:',err)}try{fillBuyProducts()}catch(err){}try{renderBatokInfo()}catch(err){}};
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
