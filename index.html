@@ -178,13 +178,27 @@
 </div>
 </section>
 
-<section id="raw" class="page"><div class="panel"><h2>Input Bahan Baku</h2><p class="hint">Setiap jenis bahan (Kelapa, Batok Kelapa, dll) dicatat &amp; dihitung <b>terpisah per nama</b> — stok dan totalnya tidak digabung dengan bahan lain. Batok Kelapa adalah hasil sampingan dari Kelapa (lihat Alur Produksi di Dashboard), jadi isi qty-nya sesuai jumlah tempurung yang benar-benar diperoleh dari kelapa yang diolah, bukan jumlah kelapa itu sendiri.</p><form id="rawForm" class="form">
+<section id="raw" class="page">
+<div class="panel"><div class="panel-head"><div><h2>Input Bahan Baku</h2><small>Tiap jenis bahan dicatat &amp; dihitung terpisah per nama. Batok kelapa adalah hasil sampingan kelapa — isi qty sesuai tempurung yang benar-benar diperoleh, bukan jumlah kelapanya.</small></div></div>
+<form id="rawForm" class="form">
+<div class="form-sec full">Info bahan</div>
 <label>Tanggal<input type=date name=date required></label><label>Nama bahan<input name=name placeholder="Contoh: Kelapa / Batok Kelapa" required></label>
 <label>Qty (kg)<input type=number name=qty min=0 step=.01 required></label><label>Harga bahan/kg (Rp)<input type=number name=price min=0 required></label>
+<div class="form-sec full">Biaya tambahan &amp; supplier</div>
 <label>Biaya transportasi (Rp)<input type=number name=transport min=0 value=0></label><label>Biaya lain-lain (Rp)<input type=number name=other min=0 value=0></label>
 <label>Supplier<input name=supplier></label><div class="cost"><span>Total biaya masuk</span><b id="rawTotal">Rp0</b><small>Bahan + transportasi + biaya lain-lain</small></div>
 <button class="primary full">Tambah Stok Bahan</button></form></div>
-<div class="panel"><div class="panel-head"><h2>Stok Bahan Baku</h2><input type="text" id="searchRaw" class="table-search" placeholder="Cari bahan / supplier…"></div><table><thead><tr><th>Bahan</th><th>Stok</th><th>Harga/kg</th><th>Transport</th><th>Biaya lain</th><th>HPP masuk/kg</th><th>Nilai stok</th><th>Supplier</th><th>AKSI</th></tr></thead><tbody id="rawTable"></tbody></table></div></section>
+<div class="panel"><div class="panel-head"><div><h2>Riwayat Pembelian Bahan Baku</h2><small>Terbaru di atas · filter berlaku untuk tabel dan ringkasan</small></div></div>
+<div class="fbar" id="rawFilter">
+<div class="fchips"><button type="button" data-p="all" class="on">Semua</button><button type="button" data-p="today">Hari ini</button><button type="button" data-p="7d">7 hari</button><button type="button" data-p="month">Bulan ini</button><button type="button" data-p="lastmonth">Bulan lalu</button><button type="button" data-p="custom">Kustom</button></div>
+<div class="frange" id="rawRange" hidden><input type="date" id="rawFrom" aria-label="Dari tanggal"><span>s/d</span><input type="date" id="rawTo" aria-label="Sampai tanggal"></div>
+<select id="rawNameFilter" aria-label="Filter bahan"><option value="">Semua bahan</option></select>
+<input type="text" id="searchRaw" class="table-search" placeholder="Cari bahan / supplier…">
+</div>
+<small class="fbar-info" id="rawFilterInfo"></small>
+<div class="cards mini raw-kpis"><div><span>Total pembelian</span><b id="rawKTotal">Rp0</b><small id="rawKCount">0 transaksi</small></div><div><span>Biaya tambahan</span><b id="rawKExtra">Rp0</b><small>Transport + lain-lain</small></div><div><span>Sisa stok (periode ini)</span><b id="rawKLeft">0 kg</b><small>Belum terpakai produksi</small></div></div>
+<div id="rawBreakdown" class="raw-breakdown"></div>
+<table><thead><tr><th>Tanggal</th><th>Bahan</th><th>Qty masuk</th><th>Sisa stok</th><th>Harga/kg</th><th>Biaya tambahan</th><th>HPP masuk/kg</th><th>Total biaya</th><th>Aksi</th></tr></thead><tbody id="rawTable"></tbody><tfoot id="rawFoot"></tfoot></table></div></section>
 
 <section id="batch" class="page"><div class="panel"><h2>Buat Batch Produksi</h2><p class="hint">Pilih bahan baku &amp; masukkan berapa kg yang dipakai dari total stok — sistem otomatis mengambil dari stok yang masuk paling awal di belakang layar, Anda tidak perlu memilih lot/batch bahan baku.</p><form id="batchForm" class="form">
 <label>Tanggal<input type=date name=date required></label>
@@ -207,7 +221,11 @@
 <div id="batchHistoryEmpty" class="stock-empty" style="display:none">Tidak ada batch yang cocok dengan filter ini.</div>
 </div></section>
 
-<section id="finished" class="page"><div class="panel"><h2>Stok Barang Jadi</h2><div class="cards mini"><div><span>Stok</span><b id="fQty">0 kg</b></div><div><span>Nilai HPP</span><b id="fValue">Rp0</b></div><div><span>Rata-rata HPP/kg</span><b id="fAvg">Rp0</b></div></div><table><thead><tr><th>Batch</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedTable"></tbody></table></div></section>
+<section id="finished" class="page">
+<div class="panel"><h2>Stok Barang Jadi</h2><div class="cards mini"><div><span>Stok total</span><b id="fQty">0 kg</b></div><div><span>Nilai HPP</span><b id="fValue">Rp0</b></div><div><span>Rata-rata HPP/kg</span><b id="fAvg">Rp0</b></div></div>
+<div class="fin-split"><div class="fin-split-card is-product"><span>Hasil Produksi Sendiri</span><b id="fpQty">0 kg</b><small id="fpValue">Rp0</small></div><div class="fin-split-card is-buy"><span>Pembelian Langsung</span><b id="fbQty">0 kg</b><small id="fbValue">Rp0</small></div></div></div>
+<div class="panel"><div class="panel-head"><div><h2><i class="dot-product"></i>Hasil Produksi Sendiri</h2><small>Barang jadi dari batch produksi (kelapa → kopra, batok kelapa → arang)</small></div></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedTable"></tbody></table></div>
+<div class="panel"><div class="panel-head"><div><h2><i class="dot-buy"></i>Pembelian Langsung</h2><small>Barang jadi yang dibeli langsung, bukan hasil produksi sendiri</small></div></div><table><thead><tr><th>Kode</th><th>Tanggal</th><th>Produk Jadi</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedBuyTable"></tbody></table></div></section>
 <section id="buy" class="page"><div class="panel" id="buyPanel"><div class="panel-head"><div><h2>Catat Pembelian Barang Jadi</h2><small>Untuk barang jadi yang dibeli langsung (bukan hasil produksi sendiri). Setelah disimpan, stok Barang Jadi otomatis bertambah dan bisa dijual di menu Penjualan.</small></div></div>
 <form id="buyForm" class="form"><label>Tanggal<input type="date" name="date" required></label>
 <label>Nama produk jadi<input name="productName" list="buyProducts" placeholder="Contoh: Kopra, Arang" required autocomplete="off"><datalist id="buyProducts"></datalist></label>
@@ -326,4 +344,4 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="app.js?v=20260926a"></script><script src="deposits.js?v=20260926c"></script><script src="finance.js?v=20260926g"></script><script src="extras.js?v=20260926a"></script><script src="upgrade.js?v=20260926e"></script><script src="sales-filter.js?v=20260926a"></script></body></html>
+<script src="app.js?v=20261003b"></script><script src="deposits.js?v=20260926c"></script><script src="finance.js?v=20260926g"></script><script src="extras.js?v=20260926a"></script><script src="upgrade.js?v=20260926e"></script><script src="sales-filter.js?v=20260926a"></script></body></html>
