@@ -16,7 +16,7 @@
 <div class="section-label">Ringkasan Cepat</div>
 <div class="cards quick-glance">
 <div><span>Nilai Stok Bahan Baku</span><b id="qgRawValue">Rp0</b><small id="qgRawQty">0 kg tersimpan</small></div>
-<div><span>Nilai Stok Barang Jadi</span><b id="qgFinValue">Rp0</b><small id="qgFinQty">0 kg siap jual</small></div>
+<div><span>Stok Barang Jadi</span><b id="qgFinValue">0 kg</b><small id="qgFinQty">0 kg siap jual</small></div>
 <div><span>Batch Bulan Ini</span><b id="qgBatchMonth">0</b><small id="qgOutputMonth">0 kg dihasilkan</small></div>
 <div><span>Rata² Rendemen Keseluruhan</span><b id="qgYieldAvg">0%</b><small id="qgYieldTrend">Belum ada tren</small></div>
 </div>
@@ -222,10 +222,12 @@
 </div></section>
 
 <section id="finished" class="page">
-<div class="panel"><h2>Stok Barang Jadi</h2><div class="cards mini"><div><span>Stok total</span><b id="fQty">0 kg</b></div><div><span>Nilai HPP</span><b id="fValue">Rp0</b></div><div><span>Rata-rata HPP/kg</span><b id="fAvg">Rp0</b></div></div>
-<div class="fin-split"><div class="fin-split-card is-product"><span>Hasil Produksi Sendiri</span><b id="fpQty">0 kg</b><small id="fpValue">Rp0</small></div><div class="fin-split-card is-buy"><span>Pembelian Langsung</span><b id="fbQty">0 kg</b><small id="fbValue">Rp0</small></div></div></div>
-<div class="panel"><div class="panel-head"><div><h2><i class="dot-product"></i>Hasil Produksi Sendiri</h2><small>Barang jadi dari batch produksi (kelapa → kopra, batok kelapa → arang)</small></div></div><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedTable"></tbody></table></div>
-<div class="panel"><div class="panel-head"><div><h2><i class="dot-buy"></i>Pembelian Langsung</h2><small>Barang jadi yang dibeli langsung, bukan hasil produksi sendiri</small></div></div><table><thead><tr><th>Kode</th><th>Tanggal</th><th>Produk Jadi</th><th>Masuk</th><th>Terjual</th><th>Sisa</th><th>HPP/kg</th></tr></thead><tbody id="finishedBuyTable"></tbody></table></div></section>
+<div class="panel fin-hero"><div class="fin-head"><div><h2>Stok Barang Jadi</h2><small>Jumlah fisik yang siap dijual</small></div><div class="fin-total"><b id="fQty">0 kg</b><small id="fCount">0 jenis produk</small></div></div>
+<div class="fin-bar" id="finBar" aria-hidden="true"></div>
+<div class="fin-split"><div class="fin-split-card is-product"><span>Hasil Produksi Sendiri</span><b id="fpQty">0 kg</b><small id="fpInfo">0 batch masih ada stok</small></div><div class="fin-split-card is-buy"><span>Pembelian Langsung</span><b id="fbQty">0 kg</b><small id="fbInfo">0 pembelian masih ada stok</small></div></div></div>
+<div class="panel est-panel"><div class="panel-head"><div><h2>Estimasi Hasil dari Stok Bahan Baku</h2><small>Stok bahan baku × rata² rendemen batch produksi. Pembelian langsung tidak ikut menghitung rendemen.</small></div></div><div id="estList" class="est-list"></div></div>
+<div class="panel"><div class="panel-head"><div><h2><i class="dot-product"></i>Hasil Produksi Sendiri</h2><small>Barang jadi dari batch produksi (kelapa → kopra, batok kelapa → arang)</small></div></div><div class="table-wrap"><table><thead><tr><th>Batch</th><th>Tanggal</th><th>Produk Jadi</th><th>Bahan Asal</th><th>Masuk</th><th>Terjual</th><th>Sisa</th></tr></thead><tbody id="finishedTable"></tbody></table></div></div>
+<div class="panel"><div class="panel-head"><div><h2><i class="dot-buy"></i>Pembelian Langsung</h2><small>Barang jadi yang dibeli langsung, bukan hasil produksi sendiri</small></div></div><div class="table-wrap"><table><thead><tr><th>Kode</th><th>Tanggal</th><th>Produk Jadi</th><th>Masuk</th><th>Terjual</th><th>Sisa</th></tr></thead><tbody id="finishedBuyTable"></tbody></table></div></div></section>
 <section id="buy" class="page"><div class="panel" id="buyPanel"><div class="panel-head"><div><h2>Catat Pembelian Barang Jadi</h2><small>Untuk barang jadi yang dibeli langsung (bukan hasil produksi sendiri). Setelah disimpan, stok Barang Jadi otomatis bertambah dan bisa dijual di menu Penjualan.</small></div></div>
 <form id="buyForm" class="form"><label>Tanggal<input type="date" name="date" required></label>
 <label>Nama produk jadi<input name="productName" list="buyProducts" placeholder="Contoh: Kopra, Arang" required autocomplete="off"><datalist id="buyProducts"></datalist></label>
