@@ -688,3 +688,47 @@ tr.row-empty td{opacity:.5}
 .fin-tot small{color:var(--muted-2);font-size:11px}
 .fin-totals{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
 .fin-tot.is-buy{border-left-color:var(--teal)}
+
+/* ============ Update tampilan & animasi: stok barang jadi, estimasi, total ============ */
+.fin-totals{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.fin-totals .fin-tot{--acc:var(--muted-2);position:relative;overflow:hidden;background:linear-gradient(180deg,var(--surface-2) 0%,var(--surface) 100%);border:1px solid var(--border);border-radius:16px;padding:16px 16px 14px;gap:0}
+.fin-totals .fin-tot::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:var(--acc)}
+.fin-totals .fin-tot.acc-kopra{--acc:var(--primary)}
+.fin-totals .fin-tot.acc-arang{--acc:var(--amber)}
+.fin-totals .fin-tot-name{font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
+.fin-totals .fin-tot b{font-family:var(--font-mono);font-size:28px;line-height:1.15;letter-spacing:-.3px;color:var(--ink);font-variant-numeric:tabular-nums}
+.fin-totals .fin-tot.is-zero b{color:var(--muted-2)}
+.fin-split-bar{display:flex;gap:3px;height:6px;margin:12px 0 9px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.fin-split-bar i{display:block;height:100%;min-width:3px;transform-origin:left center}
+.fin-split-bar i.p,.fin-legend i.p{background:var(--teal)}
+.fin-split-bar i.b,.fin-legend i.b{background:var(--violet)}
+.fin-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--muted)}
+.fin-legend span{display:inline-flex;align-items:center;gap:6px}
+.fin-legend i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.est-card{border-left:1px solid var(--border-soft);border-top:3px solid var(--amber);background:linear-gradient(180deg,var(--surface-2) 0%,var(--surface) 100%)}
+.est-bar{height:4px;border-radius:99px;background:var(--surface-3);margin-top:8px;overflow:hidden}
+.est-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--primary));transform-origin:left center}
+.est-card .est-meta{margin-top:6px}
+.est-card,.fin-tot{transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+.est-card:hover,.fin-tot:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.16);box-shadow:var(--shadow-sm)}
+.sisa-bar{flex-basis:64px;height:6px}
+.sisa-bar i{border-radius:99px;transform-origin:left center}
+.fin-bar{height:10px}
+.fin-bar i{transform-origin:left center}
+.fin-hero{background:radial-gradient(120% 90% at 100% 0%,rgba(34,197,94,.08) 0%,transparent 55%),linear-gradient(180deg,var(--surface) 0%,var(--surface-2) 100%)}
+.fin-total b{letter-spacing:-.4px;font-variant-numeric:tabular-nums}
+.batok-info>div{border-left:1px solid var(--border-soft);border-top:3px solid var(--amber)}
+.batok-info>div:nth-child(2){border-top-color:var(--teal)}
+tbody tr{transition:background .15s ease}
+tbody tr:hover td{background:rgba(255,255,255,.025)}
+
+@keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:no-preference){
+  .page.enter .fin-tot,.page.enter .est-card,.page.enter .stock-card,.page.enter .batok-info>div{animation:riseIn .5s cubic-bezier(.2,.7,.2,1) both}
+  .page.enter .fin-tot:nth-child(2),.page.enter .est-card:nth-child(2),.page.enter .stock-card:nth-child(2),.page.enter .batok-info>div:nth-child(2){animation-delay:.07s}
+  .page.enter .fin-tot:nth-child(3),.page.enter .est-card:nth-child(3),.page.enter .stock-card:nth-child(3),.page.enter .batok-info>div:nth-child(3){animation-delay:.14s}
+  .page.enter .fin-tot:nth-child(n+4),.page.enter .est-card:nth-child(n+4),.page.enter .stock-card:nth-child(n+4){animation-delay:.2s}
+  .page.enter .fin-split-bar i,.page.enter .fin-bar i,.page.enter .est-bar i,.page.enter .sisa-bar i{animation:barGrow .9s cubic-bezier(.2,.7,.2,1) .15s both}
+}
+@media(max-width:520px){.fin-totals{grid-template-columns:1fr}.fin-totals .fin-tot b{font-size:24px}}

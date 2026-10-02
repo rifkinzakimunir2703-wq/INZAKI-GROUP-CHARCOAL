@@ -26,6 +26,18 @@ const rp=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maxim
 const signed=n=>`<span class="${(+n||0)<0?'neg':'pos'}">${rp(n)}</span>`;
 const fmtDate=d=>d?day(d).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'-';
 /* Animasi hitung naik pada angka statistik utama (KPI) — dinonaktifkan otomatis jika user memilih "reduce motion" */
+/* Count-up untuk kartu total yang dibuat ulang tiap render: mulai dari nilai render sebelumnya, bukan dari nol, supaya hanya angka yang berubah yang bergerak */
+const countPrev={};
+function runCountUps(){
+  const seen={};
+  document.querySelectorAll('.js-count').forEach(el=>{
+    const key=el.dataset.key,to=+el.dataset.to||0,from=countPrev[key]===undefined?0:countPrev[key];seen[key]=to;
+    if(reduceMotion||from===to){el.textContent=kg(to);return}
+    const dur=700,t0=performance.now();
+    (function step(t){const p=Math.min((t-t0)/dur,1),e=1-Math.pow(1-p,3);el.textContent=kg(from+(to-from)*e);if(p<1&&el.isConnected)requestAnimationFrame(step);else el.textContent=kg(to)})(t0);
+  });
+  Object.assign(countPrev,seen);
+}
 function animateNum(ids,target,formatFn){
   ids.forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
@@ -97,7 +109,7 @@ function yieldEstimates(){
 function estCardsHtml(){
   const list=yieldEstimates();
   if(!list.length)return '<div class="stock-empty">Belum ada stok bahan baku, jadi belum ada yang bisa diestimasi.</div>';
-  return list.map(e=>`<div class="est-card"><div class="est-from"><b>${esc(e.name)}</b><span>${kg(e.qty)}</span></div>`+(e.lines.length?e.lines.map(l=>`<div class="est-line"><div class="est-out"><span>${esc(l.product)}</span><b>≈ ${kg(l.est)}</b></div><div class="est-meta">${l.batok?`Rasio batok ${pctID(l.avg)}% · ${l.note}`:`Rata² rendemen ${pctID(l.avg)}% dari ${l.n} batch${l.n>1?` · kisaran ${kg(l.lo)} – ${kg(l.hi)}`:''}`}</div></div>`).join(''):'<div class="est-none">Belum ada batch produksi dari bahan ini, jadi rendemennya belum diketahui.</div>')+'</div>').join('');
+  return list.map(e=>`<div class="est-card"><div class="est-from"><b>${esc(e.name)}</b><span>${kg(e.qty)}</span></div>`+(e.lines.length?e.lines.map(l=>`<div class="est-line"><div class="est-out"><span>${esc(l.product)}</span><b>≈ ${kg(l.est)}</b></div><div class="est-bar" aria-hidden="true"><i style="width:${Math.max(2,Math.min(100,l.avg))}%"></i></div><div class="est-meta">${l.batok?`Rasio batok ${pctID(l.avg)}% · ${l.note}`:`Rata² rendemen ${pctID(l.avg)}% dari ${l.n} batch${l.n>1?` · kisaran ${kg(l.lo)} – ${kg(l.hi)}`:''}`}</div></div>`).join(''):'<div class="est-none">Belum ada batch produksi dari bahan ini, jadi rendemennya belum diketahui.</div>')+'</div>').join('');
 }
 function getBiMargin(){let el=$('#biMarginTarget');return el?(+el.value||0):20}
 function empty(n){return `<tr><td colspan="${n}" style="text-align:center;color:#929a93">Belum ada data</td></tr>`}
@@ -441,12 +453,13 @@ let rawCardsHtml=Object.values(rawByName).map(v=>{
 const finTot={};Object.values(finByName).forEach(v=>{const k=normName(v.name);if(!finTot[k])finTot[k]={name:v.name,prod:0,buy:0};finTot[k][v.src]+=v.qty});
 ['kopra','arang'].forEach(k=>{if(!finTot[k])finTot[k]={name:k==='kopra'?'Kopra':'Arang',prod:0,buy:0}});
 const finTotKeys=['kopra','arang',...Object.keys(finTot).filter(k=>k!=='kopra'&&k!=='arang')];
-const finTotalsHtml=`<div class="fin-totals">${finTotKeys.map(k=>{const t=finTot[k],q=t.prod+t.buy;return `<div class="fin-tot${q>0?'':' is-zero'}"><span>Total ${esc(t.name)}</span><b>${kg(q)}</b><small>Produksi ${kg(t.prod)} · Pembelian ${kg(t.buy)}</small></div>`}).join('')}</div>`;
+const finTotalsHtml=`<div class="fin-totals">${finTotKeys.map(k=>{const t=finTot[k],q=t.prod+t.buy,acc=k==='kopra'?' acc-kopra':k==='arang'?' acc-arang':'';return `<div class="fin-tot${acc}${q>0?'':' is-zero'}"><span class="fin-tot-name">Total ${esc(t.name)}</span><b class="js-count" data-key="${esc(k)}" data-to="${q}">${kg(q)}</b><div class="fin-split-bar" aria-hidden="true">${q>0?`<i class="p" style="flex:${t.prod}"></i><i class="b" style="flex:${t.buy}"></i>`:''}</div><div class="fin-legend"><span><i class="p"></i>Produksi ${kg(t.prod)}</span><span><i class="b"></i>Pembelian ${kg(t.buy)}</span></div></div>`}).join('')}</div>`;
 const finGroupHtml=(src,title,tag)=>{const list=Object.values(finByName).filter(v=>v.src===src);if(!list.length)return '';return `<div class="stock-group-title ${src==='buy'?'is-buy':'is-product'}"><span>${title}</span></div>`+list.map(v=>`<div class="stock-card ${src==='buy'?'is-buy':'is-product'}"><span class="stock-tag">${tag}</span><div class="stock-card-name">${esc(v.name)}</div><div class="stock-card-qty">${kg(v.qty)}</div></div>`).join('')};
 let finCardsHtml=`<div class="fin-totals-wrap">${finTotalsHtml}</div>`+finGroupHtml('prod','Hasil Produksi Sendiri','Produksi Sendiri')+finGroupHtml('buy','Pembelian Langsung','Pembelian Langsung');
 if($('#stockCardsRaw'))$('#stockCardsRaw').innerHTML=rawCardsHtml||'<div class="stock-empty">Belum ada stok bahan baku. Tiap jenis bahan (mis. Kelapa) tampil sebagai kartu sendiri, jumlahnya tidak digabung dengan bahan lain.</div>';
 if($('#stockCardsFinished'))$('#stockCardsFinished').innerHTML=finCardsHtml||'<div class="stock-empty">Belum ada stok barang jadi.</div>';
 if($('#finTotals'))$('#finTotals').innerHTML=finTotalsHtml;
+runCountUps();
 $('#dProfitWeek').innerHTML=signed(ws.reduce((a,x)=>a+x.total,0)-wc-we);$('#dProfitMonth').innerHTML=signed(ms.reduce((a,x)=>a+x.total,0)-mc-me);$('#dExpenseWeek').textContent=rp(we);$('#dExpenseMonth').textContent=rp(me);
 /* Hutang perusahaan */
 let activeDebts=S.debts.filter(d=>debtRemaining(d)>0),outstanding=activeDebts.reduce((a,d)=>a+debtRemaining(d),0),overdue=activeDebts.filter(d=>debtStatus(d).label==='Jatuh Tempo').length;
@@ -1218,4 +1231,6 @@ function renderDashExtra(){
 }
 /* Hook render: statistik per lini (dashboard). Modul Keuangan mandiri ada di finance.js */
 const _render=render;render=function(){_render();try{renderDashExtra()}catch(err){console.error('Statistik:',err)}try{fillBuyProducts()}catch(err){}try{renderBatokInfo()}catch(err){}};
+/* Satu momen animasi saat halaman dibuka: kartu & bar muncul berurutan. Render ulang berikutnya (mis. setelah simpan data) tidak mengulang animasi. */
+const _go=go;go=function(p){_go(p);const el=document.querySelector('.page.active');if(!el||reduceMotion)return;el.classList.remove('enter');void el.offsetWidth;el.classList.add('enter');clearTimeout(el._enterT);el._enterT=setTimeout(()=>el.classList.remove('enter'),1300)};
 $$('nav button').forEach(x=>x.onclick=()=>go(x.dataset.page));
